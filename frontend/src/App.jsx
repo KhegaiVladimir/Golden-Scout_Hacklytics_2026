@@ -90,7 +90,6 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
 
-  // Load player list once on mount
   useEffect(() => {
     fetchPlayers().then(setPlayers)
   }, [])
@@ -100,36 +99,72 @@ export default function App() {
     setError(null)
     sessionStorage.setItem('playerName', playerName)
 
-    const profile = await fetchProfile(playerName)
-    if (!profile) {
-      setError('Player not found. Check spelling and try again.')
+    try {
+      // 1. Profile
+      const profile = await fetchProfile(playerName)
+      if (!profile) {
+        setError('Player not found. Check spelling and try again.')
+        setLoading(false)
+        return
+      }
+
+      const mpg = profile.stats?.mp ?? 30
+      const age = (profile.age && profile.age !== 'N/A') ? parseFloat(profile.age) : 0
+
+      // 2. Simulation
+      const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, mpg)
+      if (!sim) {
+        setError('Simulation failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // 3. Valuation
+      const val = await calculateValue(sim.wins_added, salaryAsk, age, profile.gp, mpg)
+      console.log('valuation:', val) 
+      if (!val) {
+        setError('Valuation failed. Please try again.')
+        setLoading(false)
+        return
+      }
+      console.log(profile.stats)
+
+      // 4. Report — non-critical, app works without it
+      let rep = null
+      try {
+        rep = await generateReport({
+          player:             profile.player,
+          position:           profile.position,
+          impact_score:       profile.impact_score,
+          percentile:         profile.percentile,
+          trend_signal:       profile.trend_signal,
+          wins_added:         sim.wins_added,
+          expected_wins:      sim.expected_wins,
+          playoff_prob:       sim.playoff_prob,
+          fair_value_m:       val.fair_value_m,
+          efficiency_ratio:   val.efficiency_ratio,
+          overpay_pct:        val.overpay_pct,
+          decision:           val.decision,
+          absence_reason:     val.absence_reason   ?? 'full',
+          is_projected:       val.is_projected     ?? false,
+          projected_wins:     val.projected_wins,
+          requested_salary_m: salaryAsk,
+          current_team_wins:  teamWins,
+        })
+      } catch {
+        // Report failing shouldn't block the user — they can still see the decision
+        console.warn('Report generation failed, continuing without it.')
+      }
+
+      setPlayerData({ profile, simulation: sim, valuation: val, report: rep, teamWins, salaryAsk })
+      setScreen('profile')
+
+    } catch (err) {
+      setError('Something went wrong. Please check your connection and try again.')
+      console.error(err)
+    } finally {
       setLoading(false)
-      return
     }
-
-    const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, profile.stats?.mp ?? 30)
-    const age = (profile.age && profile.age !== 'N/A') ? parseFloat(profile.age) : 0
-    const val = await calculateValue(sim?.wins_added ?? 0, salaryAsk, age, profile.gp)
-    const rep = await generateReport({
-      player:           profile.player,
-      position:         profile.position,
-      impact_score:     profile.impact_score,
-      percentile:       profile.percentile,
-      trend_signal:     profile.trend_signal,
-      wins_added:       sim?.wins_added       ?? 0,
-      expected_wins:    sim?.expected_wins    ?? 0,
-      playoff_prob:     sim?.playoff_prob     ?? 0,
-      fair_value_m:     val?.fair_value_m     ?? 0,
-      efficiency_ratio: val?.efficiency_ratio ?? 0,
-      overpay_pct:      val?.overpay_pct      ?? 0,
-      decision:         val?.decision         ?? 'NEGOTIATE',
-      requested_salary_m: salaryAsk,
-      current_team_wins:  teamWins,
-    })
-
-    setPlayerData({ profile, simulation: sim, valuation: val, report: rep, teamWins, salaryAsk })
-    setLoading(false)
-    setScreen('profile')
   }
 
   const nav = (s) => setScreen(s)

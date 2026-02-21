@@ -20,7 +20,17 @@ export const mockSimulation = {
 }
 
 export const mockValuation = {
-  fair_value_m: 26.98, efficiency_ratio: 0.84, overpay_pct: 18.6, decision: "NEGOTIATE",
+  fair_value_m: 26.98,
+  efficiency_ratio: 0.84,
+  overpay_pct: 18.6,
+  decision: "NEGOTIATE",
+  durability_score: 0.73,
+  durability_discount_pct: 27.0,
+  health_adjusted_value_m: 19.7,
+  risk_label: "MODERATE RISK",
+  projected_wins: 13.2,
+  is_projected: true,
+  absence_reason: "injury",  // Tatum gp=44, mp=35.2 → injury season
 }
 
 export const mockReport = {

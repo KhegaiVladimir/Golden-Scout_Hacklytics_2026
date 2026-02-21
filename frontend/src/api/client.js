@@ -22,10 +22,10 @@ export const runSimulation = async (impact_score, current_team_wins, games_playe
   } catch { return null }
 }
 
-export const calculateValue = async (wins_added, requested_salary_m, age = 0, gp = 82) => {
+export const calculateValue = async (wins_added, requested_salary_m, age = 0, gp = 82, mpg = 30.0) => {
   if (USE_MOCK) return mockValuation
   try {
-    return (await api.post('/value', { wins_added, requested_salary_m, value_per_win: 3.8, age, gp })).data
+    return (await api.post('/value', { wins_added, requested_salary_m, value_per_win: 3.8, age, gp, mpg })).data
   } catch { return null }
 }
 
