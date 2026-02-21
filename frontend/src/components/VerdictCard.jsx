@@ -1,79 +1,34 @@
-const VerdictCard = ({ valuation }) => {
-  const getVerdictConfig = (recommendation) => {
-    switch (recommendation) {
-      case 'SIGN':
-        return {
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-500',
-          textColor: 'text-green-800',
-          titleColor: 'text-green-900',
-          icon: '✓',
-        }
-      case 'NEGOTIATE':
-        return {
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-yellow-500',
-          textColor: 'text-yellow-800',
-          titleColor: 'text-yellow-900',
-          icon: '↔',
-        }
-      case 'AVOID':
-        return {
-          bgColor: 'bg-red-50',
-          borderColor: 'border-red-500',
-          textColor: 'text-red-800',
-          titleColor: 'text-red-900',
-          icon: '✗',
-        }
-      default:
-        return {
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-500',
-          textColor: 'text-gray-800',
-          titleColor: 'text-gray-900',
-          icon: '?',
-        }
-    }
-  }
+const CONFIG = {
+  SIGN:      { label: '✓ SIGN',      cls: 'bg-green-900/40 border-green-500 text-green-400' },
+  NEGOTIATE: { label: '⟳ NEGOTIATE', cls: 'bg-amber-900/40 border-amber-500  text-amber-400'  },
+  AVOID:     { label: '✕ AVOID',     cls: 'bg-red-900/40   border-red-500    text-red-400'    },
+}
 
-  const config = getVerdictConfig(valuation?.recommendation)
+function fmt(n) {
+  return n != null ? `$${Number(n).toFixed(1)}M` : '—'
+}
 
+export default function VerdictCard({ decision, efficiency_ratio, overpay_pct, fair_value_m, requested_salary_m }) {
+  const cfg = CONFIG[decision] || CONFIG.NEGOTIATE
   return (
-    <div className={`border-2 ${config.borderColor} ${config.bgColor} rounded-lg p-6`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className={`text-2xl font-bold ${config.titleColor}`}>
-          {config.icon} {valuation?.recommendation || 'UNKNOWN'}
-        </h3>
-      </div>
-      <p className={`${config.textColor} mb-4`}>
-        {valuation?.reasoning || 'No reasoning provided'}
-      </p>
-      <div className="grid grid-cols-2 gap-4 mt-4">
+    <div className={`rounded-xl border-2 p-6 text-center ${cfg.cls}`}>
+      <p className="font-mono text-5xl font-bold tracking-tight mb-4">{cfg.label}</p>
+      <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/10">
         <div>
-          <div className="text-sm text-gray-600">Annual Value</div>
-          <div className="text-lg font-semibold">
-            ${valuation?.annual_value?.toLocaleString() || 'N/A'}
-          </div>
+          <p className="text-xs text-scout-muted uppercase tracking-wider mb-1">Efficiency</p>
+          <p className={`font-mono text-xl font-bold ${efficiency_ratio >= 1 ? 'text-green-400' : 'text-scout-amber'}`}>
+            {efficiency_ratio?.toFixed(2)}×
+          </p>
         </div>
         <div>
-          <div className="text-sm text-gray-600">Total Value</div>
-          <div className="text-lg font-semibold">
-            ${valuation?.total_value?.toLocaleString() || 'N/A'}
-          </div>
+          <p className="text-xs text-scout-muted uppercase tracking-wider mb-1">Overpay</p>
+          <p className="font-mono text-xl font-bold text-scout-text">{overpay_pct?.toFixed(1)}%</p>
         </div>
         <div>
-          <div className="text-sm text-gray-600">Contract Years</div>
-          <div className="text-lg font-semibold">{valuation?.years || 'N/A'}</div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600">Impact Score</div>
-          <div className="text-lg font-semibold">
-            {valuation?.impact_score?.toFixed(2) || 'N/A'}
-          </div>
+          <p className="text-xs text-scout-muted uppercase tracking-wider mb-1">Fair Value</p>
+          <p className="font-mono text-xl font-bold text-scout-teal">{fmt(fair_value_m)}</p>
         </div>
       </div>
     </div>
   )
 }
-
-export default VerdictCard

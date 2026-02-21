@@ -1,119 +1,69 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { analyzePlayer } from '../api/client'
 import VerdictCard from '../components/VerdictCard'
-import Skeleton from '../components/Skeleton'
 
-const DecisionScreen = () => {
-  const [analysis, setAnalysis] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const navigate = useNavigate()
+export default function DecisionScreen({ data, onNext, onBack }) {
+  const { profile, simulation, valuation, salaryAsk } = data
+  if (!profile || !valuation) return null
 
-  useEffect(() => {
-    const playerName = sessionStorage.getItem('playerName')
-    const contractValue = parseFloat(sessionStorage.getItem('contractValue'))
-    const contractYears = parseInt(sessionStorage.getItem('contractYears'))
-
-    if (!playerName || !contractValue || !contractYears) {
-      navigate('/')
-      return
-    }
-
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        const analysisData = await analyzePlayer(playerName, contractValue, contractYears)
-        setAnalysis(analysisData)
-      } catch (error) {
-        console.error('Error fetching valuation:', error)
-        alert('Error loading valuation data')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [navigate])
-
-  const handleNext = () => {
-    navigate('/report')
-  }
-
-  const handleBack = () => {
-    navigate('/simulation')
-  }
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Skeleton className="h-64" />
-      </div>
-    )
-  }
-
-  if (!analysis || !analysis.valuation) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-red-600">Error loading valuation data</p>
-      </div>
-    )
-  }
+  const { fair_value_m, efficiency_ratio, overpay_pct, decision } = valuation
+  const wins_added = simulation?.wins_added ?? 0
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <main className="max-w-5xl mx-auto px-6 py-8 fade-up">
+
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Contract Decision</h1>
-        <p className="text-gray-600">
-          Based on statistical analysis and market valuation
-        </p>
+        <h2 className="text-2xl font-bold text-scout-text">Contract Decision</h2>
+        <p className="font-mono text-sm text-scout-muted mt-1">{profile.player} · Salary ask: ${salaryAsk}M/yr</p>
       </div>
 
-      <div className="max-w-3xl mx-auto mb-6">
-        <VerdictCard valuation={analysis.valuation} />
-      </div>
-
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Contract Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div className="text-sm text-gray-600">Player</div>
-            <div className="text-lg font-semibold">{sessionStorage.getItem('playerName')}</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Total Contract Value</div>
-            <div className="text-lg font-semibold">
-              ${parseFloat(sessionStorage.getItem('contractValue')).toLocaleString()}
-            </div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Contract Years</div>
-            <div className="text-lg font-semibold">{sessionStorage.getItem('contractYears')} years</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Annual Average Value</div>
-            <div className="text-lg font-semibold">
-              ${(parseFloat(sessionStorage.getItem('contractValue')) / parseInt(sessionStorage.getItem('contractYears'))).toLocaleString()}
-            </div>
-          </div>
+      {/* Top 3 numbers */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Fair Value</p>
+          <p className="font-mono text-3xl font-bold text-scout-teal">${fair_value_m.toFixed(1)}M</p>
+        </div>
+        <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Salary Ask</p>
+          <p className="font-mono text-3xl font-bold text-scout-text">${salaryAsk}M</p>
+        </div>
+        <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Efficiency</p>
+          <p className={`font-mono text-3xl font-bold ${efficiency_ratio >= 1 ? 'text-green-400' : 'text-scout-amber'}`}>
+            {efficiency_ratio.toFixed(2)}×
+          </p>
         </div>
       </div>
 
-      <div className="flex justify-between">
-        <button
-          onClick={handleBack}
-          className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-        >
+      {/* Verdict */}
+      <div className="mb-4">
+        <VerdictCard
+          decision={decision}
+          efficiency_ratio={efficiency_ratio}
+          overpay_pct={overpay_pct}
+          fair_value_m={fair_value_m}
+          requested_salary_m={salaryAsk}
+        />
+      </div>
+
+      {/* Context note */}
+      <p className="font-mono text-xs text-scout-muted text-center mb-2">
+        Fair market value based on {wins_added.toFixed(1)} wins × $3.8M/win (Berri & Schmidt, 2010)
+      </p>
+      {decision === 'NEGOTIATE' && (
+        <p className="font-mono text-xs text-scout-amber text-center">
+          Suggested range: ${(fair_value_m * 0.95).toFixed(1)}M – ${(fair_value_m * 1.05).toFixed(1)}M
+        </p>
+      )}
+
+      <div className="flex justify-between mt-8">
+        <button onClick={onBack}
+          className="font-mono text-sm text-scout-muted hover:text-scout-text transition-colors">
           ← Back
         </button>
-        <button
-          onClick={handleNext}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-        >
-          View AI Report →
+        <button onClick={onNext}
+          className="px-6 py-2.5 bg-scout-teal text-scout-bg font-mono font-bold text-sm tracking-wider rounded-lg hover:bg-scout-teal/90 transition-all">
+          Next: AI Report →
         </button>
       </div>
-    </div>
+    </main>
   )
 }
-
-export default DecisionScreen
