@@ -48,7 +48,7 @@ def calculate_value(wins_added: float, requested_salary_m: float, value_per_win:
 
     if efficiency_ratio >= 1.0:
         decision = "SIGN"
-    elif efficiency_ratio >= 0.65:
+    elif efficiency_ratio >= 0.50:
         decision = "NEGOTIATE"
     else:
         decision = "AVOID"

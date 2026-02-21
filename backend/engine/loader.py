@@ -8,29 +8,50 @@ import os
 from fuzzywuzzy import process
 from typing import Dict, List
 
-# Position mapping for top players
+# Position mapping — use exact names from CSV (including Unicode)
 POSITION_MAP = {
     # PG
-    "Stephen Curry": "PG", "Luka Doncic": "PG", "Tyrese Haliburton": "PG",
+    "Stephen Curry": "PG", "Luka Dončić": "PG", "Tyrese Haliburton": "PG",
     "Damian Lillard": "PG", "Trae Young": "PG", "LaMelo Ball": "PG",
     "Jalen Brunson": "PG", "De'Aaron Fox": "PG", "Shai Gilgeous-Alexander": "PG",
-    "Chris Paul": "PG", "Fred VanVleet": "PG", "Kemba Walker": "PG",
+    "Chris Paul": "PG", "Fred VanVleet": "PG", "Ja Morant": "PG",
+    "Cade Cunningham": "PG", "James Harden": "PG", "Tyrese Maxey": "PG",
+    "Darius Garland": "PG", "Dejounte Murray": "PG", "Immanuel Quickley": "PG",
+    "Cole Anthony": "PG", "Dennis Schröder": "PG", "Coby White": "PG",
+    "Jamal Murray": "PG", "Kyle Lowry": "PG", "Elfrid Payton": "PG",
+    "Monte Morris": "PG", "Tre Jones": "PG",
     # SG
     "Devin Booker": "SG", "Donovan Mitchell": "SG", "Bradley Beal": "SG",
     "Zach LaVine": "SG", "Anthony Edwards": "SG", "Jaylen Brown": "SG",
     "Klay Thompson": "SG", "Jordan Poole": "SG", "Tyler Herro": "SG",
+    "Kyrie Irving": "SG", "CJ McCollum": "SG", "Jalen Green": "SG",
+    "Cam Thomas": "SG", "Norman Powell": "SG", "Brandon Miller": "SG",
+    "Bogdan Bogdanović": "SG", "Josh Giddey": "SG", "Malik Monk": "SG",
+    "Anfernee Simons": "SG", "Jordan Clarkson": "SG", "Gary Trent Jr.": "SG",
     # SF
     "LeBron James": "SF", "Jayson Tatum": "SF", "Kawhi Leonard": "SF",
     "Jimmy Butler": "SF", "Paul George": "SF", "Khris Middleton": "SF",
     "Brandon Ingram": "SF", "OG Anunoby": "SF", "Michael Porter Jr.": "SF",
+    "Kevin Durant": "SF", "Franz Wagner": "SF", "Paolo Banchero": "SF",
+    "RJ Barrett": "SF", "Scottie Barnes": "SF", "Jalen Williams": "SF",
+    "Mikal Bridges": "SF", "Dario Šarić": "SF", "Trey Murphy III": "SF",
+    "Trey Murphy": "SF", "Cam Johnson": "SF", "Harrison Barnes": "SF",
+    "Andrew Wiggins": "SF", "Aaron Gordon": "SF", "Jabari Smith Jr.": "SF",
     # PF
     "Giannis Antetokounmpo": "PF", "Pascal Siakam": "PF", "Zion Williamson": "PF",
     "Julius Randle": "PF", "Jaren Jackson Jr.": "PF", "John Collins": "PF",
     "Draymond Green": "PF", "Kyle Kuzma": "PF", "Miles Bridges": "PF",
+    "Victor Wembanyama": "PF", "Chet Holmgren": "PF", "Jabari Parker": "PF",
+    "Nikola Jović": "PF", "Isaiah Jackson": "PF", "Keegan Murray": "PF",
+    "Evan Mobley": "PF", "Jeremiah Robinson-Earl": "PF",
     # C
-    "Nikola Jokic": "C", "Joel Embiid": "C", "Anthony Davis": "C",
+    "Nikola Jokić": "C", "Joel Embiid": "C", "Anthony Davis": "C",
     "Karl-Anthony Towns": "C", "Bam Adebayo": "C", "Rudy Gobert": "C",
     "Domantas Sabonis": "C", "Myles Turner": "C", "Brook Lopez": "C",
+    "Alperen Şengün": "C", "Kristaps Porziņģis": "C", "Nikola Vučević": "C",
+    "Walker Kessler": "C", "Jonas Valančiūnas": "C", "Daniel Gafford": "C",
+    "Jusuf Nurkić": "C", "Robert Williams": "C", "Dereck Lively II": "C",
+    "Dereck Lively": "C", "Clint Capela": "C", "Ivica Zubac": "C",
 }
 
 # Global dataframes - loaded at module import
@@ -56,7 +77,7 @@ def _load_and_process_data():
     
     # Aggregate per player
     agg_dict = {
-        'Tm': 'first',  # Most common team
+        'Tm': 'last',   # Most recent team (handles mid-season trades)
         'MP': 'mean',
         'FG': 'mean',
         'FGA': 'mean',
@@ -127,8 +148,26 @@ def _load_and_process_data():
     df_agg = df_agg.merge(df_salary[['Player', 'Salary_M']], on='Player', how='left')
     df_agg['Salary_M'] = df_agg['Salary_M'].fillna(0.0)
     
-    # Assign positions
-    df_agg['Pos'] = df_agg['Player'].map(POSITION_MAP).fillna('SF')
+    # Assign positions: named map first, then stats-based heuristic
+    df_agg['Pos'] = df_agg['Player'].map(POSITION_MAP)
+
+    def _infer_pos(row):
+        if pd.notna(row['Pos']):
+            return row['Pos']
+        blk, trb, ast, pts, mp = row['BLK'], row['TRB'], row['AST'], row['PTS'], row['MP']
+        if mp < 5:
+            return 'SF'
+        if blk >= 1.5 and trb >= 7.0:
+            return 'C'
+        if blk >= 0.7 and trb >= 5.5:
+            return 'PF'
+        if ast >= 5.5 and trb < 5.5:
+            return 'PG'
+        if ast >= 3.0 and pts >= 8 and trb < 5.0:
+            return 'SG'
+        return 'SF'
+
+    df_agg['Pos'] = df_agg.apply(_infer_pos, axis=1)
     
     # Calculate TS%
     # TS% = PTS / (2 * (FGA + 0.44 * FTA))
