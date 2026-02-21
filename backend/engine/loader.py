@@ -145,14 +145,34 @@ def _load_and_process_data():
         df_salary['Salary_M'] = df_salary['Salary'].apply(parse_salary)
     
     # Merge salary data
-    df_agg = df_agg.merge(df_salary[['Player', 'Salary_M']], on='Player', how='left')
+    # Fuzzy merge for salary to handle accent differences (Jokić vs Jokic)
+    from fuzzywuzzy import process
+
+    def fuzzy_salary_lookup(name, salary_dict):
+        match = process.extractOne(name, salary_dict.keys(), score_cutoff=85)
+        return salary_dict[match[0]] if match else 0.0
+
+    salary_dict = dict(zip(df_salary['Player'], df_salary['Salary_M']))
+    df_agg['Salary_M'] = df_agg['Player'].apply(lambda n: fuzzy_salary_lookup(n, salary_dict))
     df_agg['Salary_M'] = df_agg['Salary_M'].fillna(0.0)
     
     # Assign positions: named map first, then stats-based heuristic
-    df_agg['Pos'] = df_agg['Player'].map(POSITION_MAP)
+    # Load positions from CSV, fall back to POSITION_MAP, then heuristic
+    pos_path = os.path.join(data_dir, "positions.csv")
+    if os.path.exists(pos_path):
+        df_pos = pd.read_csv(pos_path)[['Player', 'Pos']].drop_duplicates('Player')
+        df_agg = df_agg.merge(df_pos, on='Player', how='left')
+    else:
+        df_agg['Pos'] = None
 
+    # Fill gaps with hardcoded POSITION_MAP
+    df_agg['Pos'] = df_agg.apply(
+        lambda row: POSITION_MAP.get(row['Player'], row['Pos']), axis=1
+    )
+
+    # Final fallback heuristic for anyone still missing
     def _infer_pos(row):
-        if pd.notna(row['Pos']):
+        if pd.notna(row['Pos']) and row['Pos'] != 0:
             return row['Pos']
         blk, trb, ast, pts, mp = row['BLK'], row['TRB'], row['AST'], row['PTS'], row['MP']
         if mp < 5:
