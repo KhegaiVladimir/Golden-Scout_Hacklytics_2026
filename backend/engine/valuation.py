@@ -1,66 +1,46 @@
-import pandas as pd
+"""
+Contract valuation based on wins added.
+"""
 from typing import Dict
-from engine.stats import calculate_impact_score
 
-def calculate_value(
-    player: Dict,
-    stats_df: pd.DataFrame,
-    contract_value: float,
-    contract_years: int
-) -> Dict:
-    """Calculate contract valuation and recommendation"""
+VALUE_PER_WIN = 3.8  # $M per win — Berri & Schmidt 2010
+
+def calculate_value(wins_added: float, requested_salary_m: float, value_per_win: float = VALUE_PER_WIN) -> Dict:
+    """
+    Calculate contract value and efficiency.
     
-    # Calculate player's market value based on stats
-    # Simplified model using impact score and comparable players
+    Args:
+        wins_added: Expected wins added by player
+        requested_salary_m: Requested salary in millions
+        value_per_win: Dollar value per win (default 3.8)
     
-    # Get player's salary if available
-    current_salary = player.get("salary", 0)
+    Returns:
+        Dictionary with valuation metrics and decision
+    """
+    fair_value = round(wins_added * value_per_win, 2)
     
-    # Calculate annual contract value
-    annual_value = contract_value / contract_years if contract_years > 0 else contract_value
+    # Handle edge cases
+    if requested_salary_m <= 0:
+        return {
+            "fair_value_m": fair_value,
+            "efficiency_ratio": 0.0,
+            "overpay_pct": 0.0,
+            "decision": "NEGOTIATE"
+        }
     
-    # Determine recommendation
-    impact_score = calculate_impact_score(player, stats_df)
+    efficiency_ratio = round(fair_value / requested_salary_m, 3)
+    overpay_pct = round((requested_salary_m - fair_value) / max(fair_value, 0.01) * 100, 1)
     
-    # Get comparable players (similar stats)
-    # Simplified: use impact score to determine if contract is fair
-    
-    # Valuation logic:
-    # - High impact + reasonable contract = SIGN
-    # - Medium impact + high contract = NEGOTIATE
-    # - Low impact + high contract = AVOID
-    
-    if impact_score > 1.0:
-        # High impact player
-        if annual_value <= current_salary * 1.2:  # Within 20% of current
-            recommendation = "SIGN"
-            reasoning = "High impact player with reasonable contract terms"
-        else:
-            recommendation = "NEGOTIATE"
-            reasoning = "High impact player but contract may be slightly high"
-    elif impact_score > 0.0:
-        # Medium impact player
-        if annual_value <= current_salary * 1.1:
-            recommendation = "SIGN"
-            reasoning = "Solid player with fair contract"
-        else:
-            recommendation = "NEGOTIATE"
-            reasoning = "Consider negotiating contract terms"
+    if efficiency_ratio >= 1.0:
+        decision = "SIGN"
+    elif efficiency_ratio >= 0.7:
+        decision = "NEGOTIATE"
     else:
-        # Low impact player
-        if annual_value > current_salary * 0.9:
-            recommendation = "AVOID"
-            reasoning = "Low impact player with high contract value"
-        else:
-            recommendation = "NEGOTIATE"
-            reasoning = "Low impact player, contract may still be negotiable"
+        decision = "AVOID"
     
     return {
-        "recommendation": recommendation,
-        "reasoning": reasoning,
-        "annual_value": annual_value,
-        "total_value": contract_value,
-        "years": contract_years,
-        "impact_score": impact_score,
-        "current_salary": current_salary
+        "fair_value_m": fair_value,
+        "efficiency_ratio": efficiency_ratio,
+        "overpay_pct": overpay_pct,
+        "decision": decision
     }

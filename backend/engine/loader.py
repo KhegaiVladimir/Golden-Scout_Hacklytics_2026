@@ -1,74 +1,184 @@
+"""
+Loads and merges CSVs once at import time.
+Aggregates game-by-game data into per-player season averages.
+"""
 import pandas as pd
+import numpy as np
 import os
-from fuzzywuzzy import fuzz, process
-from typing import Optional, Dict, List
+from fuzzywuzzy import process
+from typing import Dict, List
 
-def load_data():
-    """Load NBA stats and salary data from CSV files"""
+# Position mapping for top players
+POSITION_MAP = {
+    # PG
+    "Stephen Curry": "PG", "Luka Doncic": "PG", "Tyrese Haliburton": "PG",
+    "Damian Lillard": "PG", "Trae Young": "PG", "LaMelo Ball": "PG",
+    "Jalen Brunson": "PG", "De'Aaron Fox": "PG", "Shai Gilgeous-Alexander": "PG",
+    "Chris Paul": "PG", "Fred VanVleet": "PG", "Kemba Walker": "PG",
+    # SG
+    "Devin Booker": "SG", "Donovan Mitchell": "SG", "Bradley Beal": "SG",
+    "Zach LaVine": "SG", "Anthony Edwards": "SG", "Jaylen Brown": "SG",
+    "Klay Thompson": "SG", "Jordan Poole": "SG", "Tyler Herro": "SG",
+    # SF
+    "LeBron James": "SF", "Jayson Tatum": "SF", "Kawhi Leonard": "SF",
+    "Jimmy Butler": "SF", "Paul George": "SF", "Khris Middleton": "SF",
+    "Brandon Ingram": "SF", "OG Anunoby": "SF", "Michael Porter Jr.": "SF",
+    # PF
+    "Giannis Antetokounmpo": "PF", "Pascal Siakam": "PF", "Zion Williamson": "PF",
+    "Julius Randle": "PF", "Jaren Jackson Jr.": "PF", "John Collins": "PF",
+    "Draymond Green": "PF", "Kyle Kuzma": "PF", "Miles Bridges": "PF",
+    # C
+    "Nikola Jokic": "C", "Joel Embiid": "C", "Anthony Davis": "C",
+    "Karl-Anthony Towns": "C", "Bam Adebayo": "C", "Rudy Gobert": "C",
+    "Domantas Sabonis": "C", "Myles Turner": "C", "Brook Lopez": "C",
+}
+
+# Global dataframes - loaded at module import
+df_players = None
+player_list = []
+
+def _load_and_process_data():
+    """Internal function to load and process data on module import"""
+    global df_players, player_list
+    
     base_dir = os.path.dirname(os.path.dirname(__file__))
     data_dir = os.path.join(base_dir, "data")
     
-    stats_path = os.path.join(data_dir, "nba_stats_2324.csv")
-    salary_path = os.path.join(data_dir, "nba_salary_2324.csv")
+    # Load game-by-game data
+    game_data_path = os.path.join(data_dir, "database_24_25.csv")
+    if not os.path.exists(game_data_path):
+        raise FileNotFoundError(f"Game data file not found: {game_data_path}")
     
-    if not os.path.exists(stats_path):
-        raise FileNotFoundError(f"Stats file not found: {stats_path}")
+    df_games = pd.read_csv(game_data_path)
+    
+    # Convert Data column to datetime
+    df_games['Data'] = pd.to_datetime(df_games['Data'], errors='coerce')
+    
+    # Aggregate per player
+    agg_dict = {
+        'Tm': 'first',  # Most common team
+        'MP': 'mean',
+        'FG': 'mean',
+        'FGA': 'mean',
+        'FG%': 'mean',
+        '3P': 'mean',
+        '3PA': 'mean',
+        '3P%': 'mean',
+        'FT': 'mean',
+        'FTA': 'mean',
+        'FT%': 'mean',
+        'ORB': 'mean',
+        'DRB': 'mean',
+        'TRB': 'mean',
+        'AST': 'mean',
+        'STL': 'mean',
+        'BLK': 'mean',
+        'TOV': 'mean',
+        'PF': 'mean',
+        'PTS': 'mean',
+        'GmSc': ['mean', 'std'],
+        'Data': 'max'  # Latest game date
+    }
+    
+    df_agg = df_games.groupby('Player').agg(agg_dict).reset_index()
+    
+    # Flatten column names
+    df_agg.columns = ['Player', 'Tm', 'MP', 'FG', 'FGA', 'FG%', '3P', '3PA', '3P%', 
+                      'FT', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 
+                      'TOV', 'PF', 'PTS', 'GmSc_mean', 'GmSc_std', 'LastGame']
+    
+    # Count games played
+    gp = df_games.groupby('Player').size().reset_index(name='GP')
+    df_agg = df_agg.merge(gp, on='Player', how='left')
+    
+    # Calculate last 10 games GmSc
+    def get_last10_gmsc(group):
+        sorted_group = group.sort_values('Data').tail(10)
+        return sorted_group['GmSc'].mean() if len(sorted_group) > 0 else group['GmSc'].mean()
+    
+    last10 = df_games.groupby('Player').apply(get_last10_gmsc).reset_index(name='GmSc_last10')
+    df_agg = df_agg.merge(last10, on='Player', how='left')
+    
+    # Fill NaN in GmSc_last10 with GmSc_mean
+    df_agg['GmSc_last10'] = df_agg['GmSc_last10'].fillna(df_agg['GmSc_mean'])
+    df_agg['GmSc_std'] = df_agg['GmSc_std'].fillna(0)
+    
+    # Load salary data
+    salary_path = os.path.join(data_dir, "NBA Player Salaries_2024-25_1.csv")
     if not os.path.exists(salary_path):
-        raise FileNotFoundError(f"Salary file not found: {salary_path}")
+        print(f"Warning: Salary file not found: {salary_path}")
+        df_salary = pd.DataFrame(columns=['Player', 'Team', 'Salary'])
+    else:
+        df_salary = pd.read_csv(salary_path)
+        
+        # Parse salary: remove $, commas, spaces, convert to float, divide by 1M
+        def parse_salary(sal_str):
+            if pd.isna(sal_str):
+                return 0.0
+            try:
+                cleaned = str(sal_str).replace('$', '').replace(',', '').replace(' ', '').strip()
+                return float(cleaned) / 1_000_000
+            except:
+                return 0.0
+        
+        df_salary['Salary_M'] = df_salary['Salary'].apply(parse_salary)
     
-    stats_df = pd.read_csv(stats_path)
-    salary_df = pd.read_csv(salary_path)
+    # Merge salary data
+    df_agg = df_agg.merge(df_salary[['Player', 'Salary_M']], on='Player', how='left')
+    df_agg['Salary_M'] = df_agg['Salary_M'].fillna(0.0)
     
-    return stats_df, salary_df
+    # Assign positions
+    df_agg['Pos'] = df_agg['Player'].map(POSITION_MAP).fillna('SF')
+    
+    # Calculate TS%
+    # TS% = PTS / (2 * (FGA + 0.44 * FTA))
+    # Handle division by zero
+    denominator = 2 * (df_agg['FGA'] + 0.44 * df_agg['FTA'])
+    df_agg['TS_PCT'] = df_agg['PTS'] / denominator.replace(0, 1)  # Replace 0 with 1 to avoid division by zero
+    df_agg['TS_PCT'] = df_agg['TS_PCT'].clip(0, 1).fillna(0)
+    
+    # Estimate USG% proxy
+    # USG% ≈ (FGA + 0.44*FTA + TOV) / (MP * 0.2 + 1)
+    df_agg['USG_PCT'] = (df_agg['FGA'] + 0.44 * df_agg['FTA'] + df_agg['TOV']) / (df_agg['MP'] * 0.2 + 1)
+    df_agg['USG_PCT'] = df_agg['USG_PCT'].fillna(0)
+    
+    # Fill all remaining NaN with 0
+    df_agg = df_agg.fillna(0)
+    
+    # Round numeric columns
+    numeric_cols = df_agg.select_dtypes(include=[np.number]).columns
+    df_agg[numeric_cols] = df_agg[numeric_cols].round(3)
+    
+    df_players = df_agg
+    player_list = sorted(df_players['Player'].unique().tolist())
 
-def get_player(player_name: str, stats_df: pd.DataFrame, salary_df: pd.DataFrame) -> Optional[Dict]:
-    """Get player data by name with fuzzy matching"""
+# Load data on module import
+_load_and_process_data()
+
+def get_player(name: str) -> Dict:
+    """
+    Fuzzy match player name, return row as dict with all NaN replaced by 0.
+    Raises ValueError if not found (score < 70).
+    """
+    if df_players is None:
+        raise RuntimeError("Data not loaded")
+    
     # Try exact match first
-    player_stats = stats_df[stats_df["Player"].str.contains(player_name, case=False, na=False)]
+    exact_match = df_players[df_players['Player'].str.lower() == name.lower()]
+    if not exact_match.empty:
+        player_dict = exact_match.iloc[0].to_dict()
+        return {k: (0 if pd.isna(v) else v) for k, v in player_dict.items()}
     
-    if player_stats.empty:
-        # Use fuzzy matching
-        player_names = stats_df["Player"].unique()
-        match = process.extractOne(player_name, player_names, scorer=fuzz.ratio)
-        if match and match[1] >= 70:  # 70% similarity threshold
-            player_name = match[0]
-            player_stats = stats_df[stats_df["Player"] == player_name]
-        else:
-            return None
+    # Fuzzy match
+    player_names = df_players['Player'].unique().tolist()
+    match = process.extractOne(name, player_names, score_cutoff=70)
     
-    if player_stats.empty:
-        return None
+    if not match:
+        raise ValueError(f"Player not found: {name}")
     
-    player_row = player_stats.iloc[0]
+    matched_name = match[0]
+    player_row = df_players[df_players['Player'] == matched_name].iloc[0]
     player_dict = player_row.to_dict()
     
-    # Merge salary data if available
-    player_salary = salary_df[salary_df["Player"].str.contains(player_name, case=False, na=False)]
-    if not player_salary.empty:
-        salary_row = player_salary.iloc[0]
-        player_dict["salary"] = salary_row.get("Salary", 0)
-        player_dict["contract_years"] = salary_row.get("Years", 0)
-    
-    return player_dict
-
-def search_players(query: str, stats_df: pd.DataFrame, limit: int = 10) -> List[Dict]:
-    """Fuzzy search for players"""
-    if not query or len(query) < 2:
-        return []
-    
-    player_names = stats_df["Player"].unique().tolist()
-    
-    # Get fuzzy matches
-    matches = process.extract(query, player_names, limit=limit, scorer=fuzz.ratio)
-    
-    results = []
-    for match_name, score, _ in matches:
-        if score >= 60:  # 60% similarity threshold
-            player = get_player(match_name, stats_df, pd.DataFrame())
-            if player:
-                results.append({
-                    "name": match_name,
-                    "score": score
-                })
-    
-    return results[:limit]
+    # Replace all NaN with 0
+    return {k: (0 if pd.isna(v) else v) for k, v in player_dict.items()}

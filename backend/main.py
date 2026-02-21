@@ -1,13 +1,19 @@
-from fastapi import FastAPI, HTTPException
+"""
+Complete FastAPI app for GoldenScout — NBA contract decision engine.
+"""
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Dict, List
 import os
+import io
+import json
 from dotenv import load_dotenv
 
-from engine.loader import load_data, get_player, search_players
-from engine.stats import calculate_z_scores, calculate_impact_score, calculate_percentile, calculate_cv, calculate_trend
+from engine.loader import df_players, player_list, get_player
+from engine.stats import build_full_profile, compute_position_stats
 from engine.simulation import simulate_season
 from engine.valuation import calculate_value
 from ai.gemini import generate_report
@@ -17,10 +23,10 @@ load_dotenv()
 
 app = FastAPI(title="Golden Scout API")
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,142 +34,159 @@ app.add_middleware(
 # Mount static files for audio cache
 audio_cache_dir = os.path.join(os.path.dirname(__file__), "audio_cache")
 os.makedirs(audio_cache_dir, exist_ok=True)
-app.mount("/audio", StaticFiles(directory=audio_cache_dir), name="audio")
+app.mount("/audio-files", StaticFiles(directory=audio_cache_dir), name="audio_files")
 
-# Initialize data on startup
-stats_df = None
-salary_df = None
+# Pydantic models
+class SimulateRequest(BaseModel):
+    impact_score: float
+    current_team_wins: int = 38
 
-@app.on_event("startup")
-async def startup_event():
-    global stats_df, salary_df
-    stats_df, salary_df = load_data()
+class ValueRequest(BaseModel):
+    wins_added: float
+    requested_salary_m: float
+    value_per_win: float = 3.8
 
-class PlayerSearchRequest(BaseModel):
-    query: str
+class ReportRequest(BaseModel):
+    computed_results: Dict
 
-class PlayerAnalysisRequest(BaseModel):
+class AudioRequest(BaseModel):
+    text: str
     player_name: str
-    contract_value: float
-    contract_years: int
 
+class CompareRequest(BaseModel):
+    player1: str
+    player2: str
+    current_team_wins: int = 38
+    requested_salary_m: float = 20.0
+
+# Startup event
+@app.on_event("startup")
+async def startup():
+    """Trigger data load (it happens at import, this just confirms)"""
+    print(f"✅ GoldenScout ready — {len(player_list)} players loaded")
+
+# Routes
 @app.get("/")
 async def root():
-    return {"message": "Golden Scout API"}
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "players_loaded": len(player_list)
+    }
 
-@app.post("/api/search")
-async def search(request: PlayerSearchRequest):
-    """Search for players with fuzzy matching"""
+@app.get("/players")
+async def get_players():
+    """Get sorted list of all player names"""
+    return player_list
+
+@app.get("/player/{name}/profile")
+async def get_player_profile(name: str):
+    """Get complete player profile"""
     try:
-        results = search_players(request.query, stats_df)
-        return {"players": results}
+        profile = build_full_profile(name)
+        return profile
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/player/{player_name}")
-async def get_player_data(player_name: str):
-    """Get player data by name"""
+@app.post("/simulate")
+async def simulate(request: SimulateRequest):
+    """Run Monte Carlo simulation"""
     try:
-        player = get_player(player_name, stats_df, salary_df)
-        if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
-        return player
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/analyze")
-async def analyze_player(request: PlayerAnalysisRequest):
-    """Analyze player with stats, simulation, and valuation"""
-    try:
-        player = get_player(request.player_name, stats_df, salary_df)
-        if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
-        
-        # Calculate z-scores
-        z_scores = calculate_z_scores(player, stats_df)
-        
-        # Calculate impact score
-        impact_score = calculate_impact_score(player, stats_df)
-        
-        # Calculate percentiles
-        percentiles = calculate_percentile(player, stats_df)
-        
-        # Calculate CV
-        cv = calculate_cv(player, stats_df)
-        
-        # Calculate trend
-        trend = calculate_trend(player, stats_df)
-        
-        # Run simulation
-        simulation_results = simulate_season(player, stats_df, n_simulations=1000)
-        
-        # Calculate valuation
-        valuation = calculate_value(
-            player, 
-            stats_df, 
-            request.contract_value, 
-            request.contract_years
+        result = simulate_season(
+            impact_score=request.impact_score,
+            current_team_wins=request.current_team_wins
         )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/value")
+async def value(request: ValueRequest):
+    """Calculate contract value"""
+    try:
+        result = calculate_value(
+            wins_added=request.wins_added,
+            requested_salary_m=request.requested_salary_m,
+            value_per_win=request.value_per_win
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/report")
+async def report(request: ReportRequest):
+    """Generate AI report"""
+    try:
+        result = generate_report(request.computed_results)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+@app.post("/audio")
+async def audio(req: AudioRequest):
+    try:
+        result = generate_audio(req.text, req.player_name)
+        if result is None:
+            return {"fallback": True, "text": req.text}
+        return StreamingResponse(io.BytesIO(result), media_type="audio/mpeg")
+    except Exception:
+        return {"fallback": True, "text": req.text}
+
+@app.get("/compare")
+async def compare(player1: str, player2: str, current_team_wins: int = 38, requested_salary_m: float = 20.0):
+    """Compare two players head-to-head"""
+    try:
+        # Get both profiles
+        profile1 = build_full_profile(player1)
+        profile2 = build_full_profile(player2)
+        
+        # Run simulations for both
+        sim1 = simulate_season(profile1["impact_score"], current_team_wins)
+        sim2 = simulate_season(profile2["impact_score"], current_team_wins)
+        
+        # Calculate values
+        val1 = calculate_value(sim1["wins_added"], requested_salary_m)
+        val2 = calculate_value(sim2["wins_added"], requested_salary_m)
+        
+        # Build comparison dict for Gemini
+        comparison = {
+            "player1": {
+                "name": profile1["player"],
+                "impact_score": profile1["impact_score"],
+                "wins_added": sim1["wins_added"],
+                "efficiency_ratio": val1["efficiency_ratio"],
+                "decision": val1["decision"]
+            },
+            "player2": {
+                "name": profile2["player"],
+                "impact_score": profile2["impact_score"],
+                "wins_added": sim2["wins_added"],
+                "efficiency_ratio": val2["efficiency_ratio"],
+                "decision": val2["decision"]
+            },
+            "requested_salary_m": requested_salary_m
+        }
+        
+        # Generate head-to-head report
+        h2h_report = generate_report(comparison)
         
         return {
-            "player": player,
-            "z_scores": z_scores,
-            "impact_score": impact_score,
-            "percentiles": percentiles,
-            "cv": cv,
-            "trend": trend,
-            "simulation": simulation_results,
-            "valuation": valuation
+            "player1_profile": profile1,
+            "player2_profile": profile2,
+            "player1_simulation": sim1,
+            "player2_simulation": sim2,
+            "player1_valuation": val1,
+            "player2_valuation": val2,
+            "head_to_head_report": h2h_report
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/report")
-async def generate_player_report(request: PlayerAnalysisRequest):
-    """Generate AI report for player"""
-    try:
-        player = get_player(request.player_name, stats_df, salary_df)
-        if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
         
-        # Get analysis data
-        analysis = await analyze_player(request)
-        
-        # Generate report
-        report = generate_report(player, analysis, request.contract_value, request.contract_years)
-        
-        return {"report": report}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/audio")
-async def generate_audio_report(request: PlayerAnalysisRequest):
-    """Generate audio narration for report"""
-    try:
-        player = get_player(request.player_name, stats_df, salary_df)
-        if not player:
-            raise HTTPException(status_code=404, detail="Player not found")
-        
-        # Get report
-        report_response = await generate_player_report(request)
-        report_text = report_response["report"]
-        
-        # Generate audio
-        player_name = player.get("name") or player.get("Player", "Player")
-        audio_url = generate_audio(report_text, player_name)
-        
-        return {"audio_url": audio_url}
-    except HTTPException:
-        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

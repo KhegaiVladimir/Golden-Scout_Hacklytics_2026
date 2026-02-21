@@ -1,101 +1,255 @@
+"""
+Pure functions. Take data in, return data out. No I/O.
+"""
 import pandas as pd
 import numpy as np
+from scipy.stats import percentileofscore
 from typing import Dict, List
 
-# Key stats for analysis
-STAT_COLUMNS = [
-    "PTS", "TRB", "AST", "STL", "BLK", "FG%", "3P%", "FT%", 
-    "PER", "TS%", "USG%", "WS", "BPM", "VORP"
-]
-
-def calculate_z_scores(player: Dict, stats_df: pd.DataFrame) -> Dict[str, float]:
-    """Calculate z-scores for key stats"""
-    z_scores = {}
+def compute_position_stats(df: pd.DataFrame) -> Dict:
+    """
+    Group df_players by Pos.
+    For each position compute mean + std for: PTS, AST, TRB, STL, BLK, TOV, TS_PCT, USG_PCT, MP, GP
+    """
+    stats_to_compute = ['PTS', 'AST', 'TRB', 'STL', 'BLK', 'TOV', 'TS_PCT', 'USG_PCT', 'MP', 'GP']
+    pos_stats = {}
     
-    for stat in STAT_COLUMNS:
-        if stat in player and stat in stats_df.columns:
-            player_value = player[stat]
-            if pd.isna(player_value):
-                z_scores[stat] = 0.0
-                continue
-            
-            mean = stats_df[stat].mean()
-            std = stats_df[stat].std()
-            
-            if std > 0:
-                z_scores[stat] = (player_value - mean) / std
+    for pos in df['Pos'].unique():
+        pos_df = df[df['Pos'] == pos]
+        pos_stats[pos] = {}
+        
+        for stat in stats_to_compute:
+            if stat in pos_df.columns:
+                mean_val = pos_df[stat].mean()
+                std_val = pos_df[stat].std()
+                pos_stats[pos][stat] = {
+                    'mean': float(mean_val) if not pd.isna(mean_val) else 0.0,
+                    'std': float(std_val) if not pd.isna(std_val) else 0.0
+                }
             else:
-                z_scores[stat] = 0.0
+                pos_stats[pos][stat] = {'mean': 0.0, 'std': 0.0}
     
-    return z_scores
+    return pos_stats
 
-def calculate_impact_score(player: Dict, stats_df: pd.DataFrame) -> float:
-    """Calculate overall impact score (weighted combination of stats)"""
-    weights = {
-        "PTS": 0.15,
-        "TRB": 0.10,
-        "AST": 0.15,
-        "STL": 0.10,
-        "BLK": 0.10,
-        "PER": 0.15,
-        "WS": 0.10,
-        "BPM": 0.10,
-        "VORP": 0.05
-    }
-    
-    z_scores = calculate_z_scores(player, stats_df)
-    impact = sum(z_scores.get(stat, 0) * weight for stat, weight in weights.items())
-    
-    return impact
+def z_score(value: float, mean: float, std: float) -> float:
+    """
+    (value - mean) / std
+    If std == 0: return 0.0
+    Clip to [-3.0, 3.0]
+    Round to 3 decimal places
+    """
+    if std == 0:
+        return 0.0
+    z = (value - mean) / std
+    z = np.clip(z, -3.0, 3.0)
+    return round(float(z), 3)
 
-def calculate_percentile(player: Dict, stats_df: pd.DataFrame) -> Dict[str, float]:
-    """Calculate percentiles for key stats"""
-    percentiles = {}
+def compute_impact_score(player: Dict, pos_stats: Dict) -> float:
+    """
+    Compute impact score based on position-adjusted z-scores.
+    """
+    pos = player.get('Pos', 'SF')
+    if pos not in pos_stats:
+        pos = 'SF'  # Default to SF
     
-    for stat in STAT_COLUMNS:
-        if stat in player and stat in stats_df.columns:
-            player_value = player[stat]
-            if pd.isna(player_value):
-                percentiles[stat] = 0.0
-                continue
-            
-            percentile = (stats_df[stat] < player_value).sum() / len(stats_df) * 100
-            percentiles[stat] = percentile
+    stats = pos_stats[pos]
     
-    return percentiles
+    # Get z-scores
+    z_pts = z_score(player.get('PTS', 0), stats['PTS']['mean'], stats['PTS']['std'])
+    z_ast = z_score(player.get('AST', 0), stats['AST']['mean'], stats['AST']['std'])
+    z_trb = z_score(player.get('TRB', 0), stats['TRB']['mean'], stats['TRB']['std'])
+    z_stl = z_score(player.get('STL', 0), stats['STL']['mean'], stats['STL']['std'])
+    z_blk = z_score(player.get('BLK', 0), stats['BLK']['mean'], stats['BLK']['std'])
+    z_tov = z_score(player.get('TOV', 0), stats['TOV']['mean'], stats['TOV']['std'])
+    z_ts = z_score(player.get('TS_PCT', 0), stats['TS_PCT']['mean'], stats['TS_PCT']['std'])
+    z_usg = z_score(player.get('USG_PCT', 0), stats['USG_PCT']['mean'], stats['USG_PCT']['std'])
+    z_mp = z_score(player.get('MP', 0), stats['MP']['mean'], stats['MP']['std'])
+    z_gp = z_score(player.get('GP', 0), stats['GP']['mean'], stats['GP']['std'])
+    
+    # Compute components
+    offense = 0.5 * z_ts + 0.3 * z_usg + 0.2 * z_ast
+    defense = 0.4 * z_stl + 0.4 * z_blk - 0.2 * z_tov
+    stability = 0.6 * z_mp + 0.4 * z_gp
+    
+    # Age factor (default to 27 if no Age column)
+    age = player.get('Age', 27)
+    age_factor = max(0.0, 1.0 - abs(age - 27) / 10)
+    
+    efficiency = z_ts
+    
+    # Final impact score
+    impact = 0.35 * offense + 0.25 * defense + 0.20 * stability + 0.10 * age_factor + 0.10 * efficiency
+    
+    return round(float(impact), 4)
 
-def calculate_cv(player: Dict, stats_df: pd.DataFrame) -> float:
-    """Calculate coefficient of variation (consistency metric)"""
-    # Use game-to-game variance if available, otherwise use stat variance
-    # For simplicity, using overall stat variance
-    key_stats = ["PTS", "TRB", "AST"]
-    cvs = []
-    
-    for stat in key_stats:
-        if stat in player and stat in stats_df.columns:
-            player_value = player[stat]
-            if pd.isna(player_value):
-                continue
-            
-            mean = stats_df[stat].mean()
-            std = stats_df[stat].std()
-            
-            if mean > 0:
-                cv = std / mean
-                cvs.append(cv)
-    
-    return np.mean(cvs) if cvs else 0.0
+def compute_percentile(score: float, all_scores: List[float]) -> float:
+    """
+    Compute percentile using scipy.stats.percentileofscore
+    """
+    if not all_scores:
+        return 0.0
+    return round(percentileofscore(all_scores, score, kind='rank'), 1)
 
-def calculate_trend(player: Dict, stats_df: pd.DataFrame) -> str:
-    """Calculate trend: HOT, STEADY, or COLD"""
-    # Simplified trend calculation based on recent performance
-    # In a real implementation, you'd compare recent games to season average
+def compute_cv(player: Dict) -> float:
+    """
+    CV = (GmSc_std / GmSc_mean) * 100
+    If GmSc_mean == 0: return 0.0
+    Round to 1 decimal place
+    """
+    gmsc_mean = player.get('GmSc_mean', 0)
+    gmsc_std = player.get('GmSc_std', 0)
     
-    impact_score = calculate_impact_score(player, stats_df)
+    if gmsc_mean == 0:
+        return 0.0
     
-    if impact_score > 0.5:
-        return "HOT"
-    elif impact_score < -0.5:
-        return "COLD"
+    cv = (gmsc_std / gmsc_mean) * 100
+    return round(float(cv), 1)
+
+def compute_trend(player: Dict) -> str:
+    """
+    signal = (GmSc_last10 - GmSc_mean) / (GmSc_std + 0.001)
+    If signal > 0.75:  return "TRENDING_UP"
+    If signal < -0.75: return "TRENDING_DOWN"
+    Else:              return "STEADY"
+    """
+    gmsc_last10 = player.get('GmSc_last10', 0)
+    gmsc_mean = player.get('GmSc_mean', 0)
+    gmsc_std = player.get('GmSc_std', 0)
+    
+    signal = (gmsc_last10 - gmsc_mean) / (gmsc_std + 0.001)
+    
+    if signal > 0.75:
+        return "TRENDING_UP"
+    elif signal < -0.75:
+        return "TRENDING_DOWN"
     else:
         return "STEADY"
+
+def build_radar_data(player: Dict, pos_stats: Dict) -> Dict:
+    """
+    Normalize each dimension to 0–100 using percentile within all players.
+    """
+    from engine.loader import df_players
+    
+    if df_players is None:
+        return {
+            "scoring": 50.0,
+            "defense": 50.0,
+            "playmaking": 50.0,
+            "efficiency": 50.0,
+            "consistency": 50.0,
+            "durability": 50.0
+        }
+    
+    pos = player.get('Pos', 'SF')
+    if pos not in pos_stats:
+        pos = 'SF'
+    
+    stats = pos_stats[pos]
+    
+    # Get z-scores
+    z_pts = z_score(player.get('PTS', 0), stats['PTS']['mean'], stats['PTS']['std'])
+    z_ast = z_score(player.get('AST', 0), stats['AST']['mean'], stats['AST']['std'])
+    z_stl = z_score(player.get('STL', 0), stats['STL']['mean'], stats['STL']['std'])
+    z_blk = z_score(player.get('BLK', 0), stats['BLK']['mean'], stats['BLK']['std'])
+    z_ts = z_score(player.get('TS_PCT', 0), stats['TS_PCT']['mean'], stats['TS_PCT']['std'])
+    z_gp = z_score(player.get('GP', 0), stats['GP']['mean'], stats['GP']['std'])
+    
+    # Compute CV
+    cv = compute_cv(player)
+    
+    # Build radar data (clamp to 0-100)
+    scoring = np.clip(50 + z_pts * 15, 0, 100)
+    defense = np.clip(50 + ((z_stl + z_blk) / 2) * 15, 0, 100)
+    playmaking = np.clip(50 + z_ast * 15, 0, 100)
+    efficiency = np.clip(50 + z_ts * 15, 0, 100)
+    consistency = np.clip(100 - cv, 0, 100)  # Inverted: low CV = high consistency
+    durability = np.clip(50 + z_gp * 15, 0, 100)
+    
+    return {
+        "scoring": round(float(scoring), 1),
+        "defense": round(float(defense), 1),
+        "playmaking": round(float(playmaking), 1),
+        "efficiency": round(float(efficiency), 1),
+        "consistency": round(float(consistency), 1),
+        "durability": round(float(durability), 1)
+    }
+
+def build_full_profile(player_name: str) -> Dict:
+    """
+    Build complete player profile with all computed metrics.
+    """
+    from engine.loader import df_players, get_player
+    
+    player = get_player(player_name)
+    pos_stats = compute_position_stats(df_players)
+    
+    # Compute all impact scores for percentile calculation
+    all_impact_scores = []
+    for _, row in df_players.iterrows():
+        row_dict = row.to_dict()
+        impact = compute_impact_score(row_dict, pos_stats)
+        all_impact_scores.append(impact)
+    
+    impact_score = compute_impact_score(player, pos_stats)
+    percentile = compute_percentile(impact_score, all_impact_scores)
+    
+    # Get z-scores for detailed breakdown
+    pos = player.get('Pos', 'SF')
+    if pos not in pos_stats:
+        pos = 'SF'
+    stats = pos_stats[pos]
+    
+    z_pts = z_score(player.get('PTS', 0), stats['PTS']['mean'], stats['PTS']['std'])
+    z_ast = z_score(player.get('AST', 0), stats['AST']['mean'], stats['AST']['std'])
+    z_trb = z_score(player.get('TRB', 0), stats['TRB']['mean'], stats['TRB']['std'])
+    z_stl = z_score(player.get('STL', 0), stats['STL']['mean'], stats['STL']['std'])
+    z_blk = z_score(player.get('BLK', 0), stats['BLK']['mean'], stats['BLK']['std'])
+    z_tov = z_score(player.get('TOV', 0), stats['TOV']['mean'], stats['TOV']['std'])
+    z_ts = z_score(player.get('TS_PCT', 0), stats['TS_PCT']['mean'], stats['TS_PCT']['std'])
+    z_usg = z_score(player.get('USG_PCT', 0), stats['USG_PCT']['mean'], stats['USG_PCT']['std'])
+    z_mp = z_score(player.get('MP', 0), stats['MP']['mean'], stats['MP']['std'])
+    z_gp = z_score(player.get('GP', 0), stats['GP']['mean'], stats['GP']['std'])
+    
+    offense_z = 0.5 * z_ts + 0.3 * z_usg + 0.2 * z_ast
+    defense_z = 0.4 * z_stl + 0.4 * z_blk - 0.2 * z_tov
+    stability_z = 0.6 * z_mp + 0.4 * z_gp
+    
+    return {
+        "player": player.get('Player', player_name),
+        "team": player.get('Tm', 'N/A'),
+        "position": player.get('Pos', 'SF'),
+        "age": player.get('Age', 'N/A'),
+        "gp": int(player.get('GP', 0)),
+        "impact_score": impact_score,
+        "percentile": percentile,
+        "ts_pct": round(player.get('TS_PCT', 0) * 100, 1),
+        "pos_avg_ts": round(stats['TS_PCT']['mean'] * 100, 1),
+        "cv": compute_cv(player),
+        "trend_signal": compute_trend(player),
+        "salary_m": round(player.get('Salary_M', 0), 2),
+        "z_scores": {
+            "offense": round(offense_z, 3),
+            "defense": round(defense_z, 3),
+            "stability": round(stability_z, 3),
+            "pts": z_pts,
+            "ast": z_ast,
+            "reb": z_trb,
+            "stl": z_stl,
+            "blk": z_blk,
+            "tov": z_tov,
+            "ts_pct": z_ts,
+        },
+        "stats": {
+            "pts": round(player.get('PTS', 0), 1),
+            "ast": round(player.get('AST', 0), 1),
+            "reb": round(player.get('TRB', 0), 1),
+            "stl": round(player.get('STL', 0), 1),
+            "blk": round(player.get('BLK', 0), 1),
+            "tov": round(player.get('TOV', 0), 1),
+            "mp": round(player.get('MP', 0), 1),
+            "gp": int(player.get('GP', 0)),
+            "ts_pct": round(player.get('TS_PCT', 0) * 100, 1),
+        },
+        "radar": build_radar_data(player, pos_stats),
+    }

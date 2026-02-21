@@ -1,73 +1,81 @@
-import os
-import google.generativeai as genai
-from typing import Dict
+"""
+Receives pre-computed results. Interprets — never calculates.
+All math is done before this is called.
+"""
+from google import genai
+import os, json, time
+from dotenv import load_dotenv
 
-# Cache for reports
+load_dotenv()
+client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+MODEL = 'gemini-2.5-flash'
 report_cache = {}
 
-def generate_report(
-    player: Dict,
-    analysis: Dict,
-    contract_value: float,
-    contract_years: int
-) -> str:
-    """Generate AI scouting report using Gemini"""
-    
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return "Error: GEMINI_API_KEY not set"
-    
-    # Check cache
-    player_name = player.get('name') or player.get('Player', 'unknown')
-    cache_key = f"{player_name}_{contract_value}_{contract_years}"
+def generate_report(computed_results: dict) -> dict:
+    cache_key = json.dumps(computed_results, sort_keys=True, default=str)
     if cache_key in report_cache:
         return report_cache[cache_key]
-    
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
-        
-        # Build prompt
-        player_name = player.get('name') or player.get('Player', 'Player')
-        prompt = f"""
-        Generate a comprehensive NBA scouting report for {player_name}.
-        
-        Player Stats:
-        - Points: {player.get('PTS', 'N/A')}
-        - Rebounds: {player.get('TRB', 'N/A')}
-        - Assists: {player.get('AST', 'N/A')}
-        - Steals: {player.get('STL', 'N/A')}
-        - Blocks: {player.get('BLK', 'N/A')}
-        
-        Analysis:
-        - Impact Score: {analysis.get('impact_score', 0):.2f}
-        - Trend: {analysis.get('trend', 'N/A')}
-        - Simulation Mean Wins: {analysis.get('simulation', {}).get('mean_wins', 0):.1f}
-        
-        Proposed Contract:
-        - Total Value: ${contract_value:,.0f}
-        - Years: {contract_years}
-        - Annual Value: ${contract_value / contract_years:,.0f}
-        
-        Valuation: {analysis.get('valuation', {}).get('recommendation', 'N/A')}
-        
-        Please provide a detailed scouting report covering:
-        1. Player strengths and weaknesses
-        2. Statistical analysis and context
-        3. Contract evaluation
-        4. Risk assessment
-        5. Final recommendation
-        
-        Format the report in clear sections with headers.
-        """
-        
-        response = model.generate_content(prompt)
-        report = response.text
-        
-        # Cache the report
-        report_cache[cache_key] = report
-        
-        return report
-        
-    except Exception as e:
-        return f"Error generating report: {str(e)}"
+
+    prompt = f"""You are an NBA front office analyst. Based on this player data, write a brief scouting report in under 150 words total.
+
+Data: {json.dumps(computed_results, default=str)}
+
+Respond in EXACTLY this format (each on its own line):
+VERDICT: one sentence overall assessment
+STRENGTHS: one sentence about what player does well
+CONCERN: one sentence about main risk
+RECOMMENDATION: one sentence contract advice
+AUDIO_SUMMARY: two sentences suitable for text-to-speech"""
+
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=prompt
+            )
+            text = response.text
+            result = {
+                "verdict": "",
+                "strengths": "",
+                "concern": "",
+                "recommendation": "",
+                "audio_summary": ""
+            }
+            for line in text.strip().split('\n'):
+                for key in ['VERDICT','STRENGTHS','CONCERN','RECOMMENDATION','AUDIO_SUMMARY']:
+                    if line.startswith(f'{key}:'):
+                        result[key.lower()] = line.replace(f'{key}:','').strip()
+            if not result['verdict']:
+                result['verdict'] = text[:300]
+            report_cache[cache_key] = result
+            return result
+        except Exception as e:
+            if '429' in str(e) and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            # Fallback — generate report from data without AI
+            return generate_report_fallback(computed_results)
+
+def generate_report_fallback(computed_results: dict) -> dict:
+    player = computed_results.get('player', 'This player')
+    impact = float(computed_results.get('impact_score', 0))
+    wins = float(computed_results.get('wins_added', 0))
+    fair_value = float(computed_results.get('fair_value_m', 0))
+    salary = float(computed_results.get('salary_m', fair_value))
+
+    if impact > 1.5:
+        tier, action = "elite contributor", "strongly recommend signing"
+    elif impact > 0.5:
+        tier, action = "solid starter", "recommend signing at fair value"
+    elif impact > 0:
+        tier, action = "reliable role player", "consider signing if price is right"
+    else:
+        tier, action = "below-average performer", "avoid unless heavily discounted"
+
+    return {
+        "verdict": f"{player} is a {tier} projecting to add {wins:.1f} wins with an impact score of {impact:.1f}.",
+        "strengths": f"Efficiency metrics and positional rating place {player} above league average in key categories.",
+        "concern": f"Current salary of ${salary:.1f}M must be weighed against projected fair value of ${fair_value:.1f}M.",
+        "recommendation": f"We {action} — the numbers support this decision at current market rates.",
+        "audio_summary": f"{player} projects {wins:.1f} additional wins this season. Our analysis indicates you should {action} based on a fair value of {fair_value:.1f} million dollars."
+    }
