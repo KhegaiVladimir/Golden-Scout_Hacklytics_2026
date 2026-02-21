@@ -5,7 +5,13 @@ const CONFIG = {
 }
 
 function fmt(n) {
-  return n != null ? `$${Number(n).toFixed(1)}M` : '—'
+  if (n == null || n <= 0) return '$0.0M'
+  return `$${Number(n).toFixed(1)}M`
+}
+
+function fmtOverpay(pct) {
+  if (pct == null) return 'N/A'
+  return `${Number(pct).toFixed(1)}%`
 }
 
 export default function VerdictCard({ decision, efficiency_ratio, overpay_pct, fair_value_m, requested_salary_m }) {
@@ -22,7 +28,7 @@ export default function VerdictCard({ decision, efficiency_ratio, overpay_pct, f
         </div>
         <div>
           <p className="text-xs text-scout-muted uppercase tracking-wider mb-1">Overpay</p>
-          <p className="font-mono text-xl font-bold text-scout-text">{overpay_pct?.toFixed(1)}%</p>
+          <p className="font-mono text-xl font-bold text-scout-text">{fmtOverpay(overpay_pct)}</p>
         </div>
         <div>
           <p className="text-xs text-scout-muted uppercase tracking-wider mb-1">Fair Value</p>

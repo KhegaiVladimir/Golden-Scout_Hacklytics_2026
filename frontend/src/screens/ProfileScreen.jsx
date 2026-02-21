@@ -28,6 +28,16 @@ export default function ProfileScreen({ data, onNext, onBack }) {
         </div>
       </div>
 
+      {/* Small sample warning */}
+      {profile.small_sample && (
+        <div className="bg-amber-900/30 border border-amber-500/50 rounded-lg px-4 py-2 mb-4 flex items-center gap-2">
+          <span className="text-amber-400 text-sm">⚠️</span>
+          <span className="font-mono text-xs text-amber-400">
+            Small Sample Size — {profile.warnings?.[0] ?? `${profile.gp} games played — stats may be unreliable`}
+          </span>
+        </div>
+      )}
+
       {/* Radar + Stat Table */}
       <div className="grid grid-cols-5 gap-6 mb-6">
         <div className="col-span-2 bg-scout-card rounded-xl border border-scout-border p-5">

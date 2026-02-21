@@ -19,7 +19,9 @@ export default function DecisionScreen({ data, onNext, onBack }) {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Fair Value</p>
-          <p className="font-mono text-3xl font-bold text-scout-teal">${fair_value_m.toFixed(1)}M</p>
+          <p className="font-mono text-3xl font-bold text-scout-teal">
+            {fair_value_m > 0 ? `$${fair_value_m.toFixed(1)}M` : '$0.0M'}
+          </p>
         </div>
         <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Salary Ask</p>
@@ -27,8 +29,8 @@ export default function DecisionScreen({ data, onNext, onBack }) {
         </div>
         <div className="bg-scout-card rounded-xl border border-scout-border p-5 text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-widest mb-2">Efficiency</p>
-          <p className={`font-mono text-3xl font-bold ${efficiency_ratio >= 1 ? 'text-green-400' : 'text-scout-amber'}`}>
-            {efficiency_ratio.toFixed(2)}×
+          <p className={`font-mono text-3xl font-bold ${efficiency_ratio != null && efficiency_ratio >= 1 ? 'text-green-400' : 'text-scout-amber'}`}>
+            {efficiency_ratio != null ? `${efficiency_ratio.toFixed(2)}×` : 'N/A'}
           </p>
         </div>
       </div>

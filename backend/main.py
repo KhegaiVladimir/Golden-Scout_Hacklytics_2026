@@ -40,6 +40,8 @@ app.mount("/audio-files", StaticFiles(directory=audio_cache_dir), name="audio_fi
 class SimulateRequest(BaseModel):
     impact_score: float
     current_team_wins: int = 38
+    games_played: int = 82
+    mpg: float = 30.0
 
 class ValueRequest(BaseModel):
     wins_added: float
@@ -96,7 +98,9 @@ async def simulate(request: SimulateRequest):
     try:
         result = simulate_season(
             impact_score=request.impact_score,
-            current_team_wins=request.current_team_wins
+            current_team_wins=request.current_team_wins,
+            games_played=request.games_played,
+            mpg=request.mpg,
         )
         return result
     except Exception as e:
@@ -142,9 +146,11 @@ async def compare(player1: str, player2: str, current_team_wins: int = 38, reque
         profile1 = build_full_profile(player1)
         profile2 = build_full_profile(player2)
         
-        # Run simulations for both
-        sim1 = simulate_season(profile1["impact_score"], current_team_wins)
-        sim2 = simulate_season(profile2["impact_score"], current_team_wins)
+        # Run simulations for both (pass gp/mpg for small-sample discount)
+        sim1 = simulate_season(profile1["impact_score"], current_team_wins,
+                               games_played=profile1["gp"], mpg=profile1["stats"]["mp"])
+        sim2 = simulate_season(profile2["impact_score"], current_team_wins,
+                               games_played=profile2["gp"], mpg=profile2["stats"]["mp"])
         
         # Calculate values
         val1 = calculate_value(sim1["wins_added"], requested_salary_m)
