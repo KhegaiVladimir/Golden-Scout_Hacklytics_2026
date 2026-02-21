@@ -82,8 +82,8 @@ def calculate_value(
         }
 
     efficiency_ratio = round(fair_value / requested_salary_m, 3)
-    overpay_raw = (requested_salary_m - fair_value) / fair_value * 100
 
+    overpay_raw = (requested_salary_m - fair_value) / fair_value * 100
     if overpay_raw > 9999:
         overpay_pct = None
     else:

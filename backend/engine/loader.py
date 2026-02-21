@@ -132,7 +132,6 @@ def _load_and_process_data():
     else:
         df_salary = pd.read_csv(salary_path)
         
-        # Parse salary: remove $, commas, spaces, convert to float, divide by 1M
         def parse_salary(sal_str):
             if pd.isna(sal_str):
                 return 0.0
@@ -144,8 +143,7 @@ def _load_and_process_data():
         
         df_salary['Salary_M'] = df_salary['Salary'].apply(parse_salary)
     
-    # Merge salary data
-    # Fuzzy merge for salary to handle accent differences (Jokić vs Jokic)
+    # Fuzzy salary merge
     from fuzzywuzzy import process
 
     def fuzzy_salary_lookup(name, salary_dict):
@@ -156,21 +154,32 @@ def _load_and_process_data():
     df_agg['Salary_M'] = df_agg['Player'].apply(lambda n: fuzzy_salary_lookup(n, salary_dict))
     df_agg['Salary_M'] = df_agg['Salary_M'].fillna(0.0)
     
-    # Assign positions: named map first, then stats-based heuristic
-    # Load positions from CSV, fall back to POSITION_MAP, then heuristic
-    pos_path = os.path.join(data_dir, "positions.csv")
+    # ── POSITIONS + AGE ──────────────────────────────────────────────
+    # Load positions.csv — now also pulling Age column
+    pos_path = os.path.join(data_dir, "position.csv")
     if os.path.exists(pos_path):
-        df_pos = pd.read_csv(pos_path)[['Player', 'Pos']].drop_duplicates('Player')
+        df_pos = pd.read_csv(pos_path)
+        # Keep Player, Pos, and Age (Age may not exist in all versions)
+        cols_to_keep = ['Player', 'Pos']
+        if 'Age' in df_pos.columns:
+            cols_to_keep.append('Age')
+        df_pos = df_pos[cols_to_keep].drop_duplicates('Player')
         df_agg = df_agg.merge(df_pos, on='Player', how='left')
     else:
         df_agg['Pos'] = None
+        df_agg['Age'] = 0
 
-    # Fill gaps with hardcoded POSITION_MAP
+    # Ensure Age column exists after merge
+    if 'Age' not in df_agg.columns:
+        df_agg['Age'] = 0
+    df_agg['Age'] = pd.to_numeric(df_agg['Age'], errors='coerce').fillna(0).astype(int)
+
+    # Fill position gaps with hardcoded POSITION_MAP
     df_agg['Pos'] = df_agg.apply(
         lambda row: POSITION_MAP.get(row['Player'], row['Pos']), axis=1
     )
 
-    # Final fallback heuristic for anyone still missing
+    # Final fallback heuristic for anyone still missing a position
     def _infer_pos(row):
         if pd.notna(row['Pos']) and row['Pos'] != 0:
             return row['Pos']
@@ -188,16 +197,14 @@ def _load_and_process_data():
         return 'SF'
 
     df_agg['Pos'] = df_agg.apply(_infer_pos, axis=1)
+    # ─────────────────────────────────────────────────────────────────
     
     # Calculate TS%
-    # TS% = PTS / (2 * (FGA + 0.44 * FTA))
-    # Handle division by zero
     denominator = 2 * (df_agg['FGA'] + 0.44 * df_agg['FTA'])
-    df_agg['TS_PCT'] = df_agg['PTS'] / denominator.replace(0, 1)  # Replace 0 with 1 to avoid division by zero
+    df_agg['TS_PCT'] = df_agg['PTS'] / denominator.replace(0, 1)
     df_agg['TS_PCT'] = df_agg['TS_PCT'].clip(0, 1).fillna(0)
     
     # Estimate USG% proxy
-    # USG% ≈ (FGA + 0.44*FTA + TOV) / (MP * 0.2 + 1)
     df_agg['USG_PCT'] = (df_agg['FGA'] + 0.44 * df_agg['FTA'] + df_agg['TOV']) / (df_agg['MP'] * 0.2 + 1)
     df_agg['USG_PCT'] = df_agg['USG_PCT'].fillna(0)
     
@@ -239,5 +246,4 @@ def get_player(name: str) -> Dict:
     player_row = df_players[df_players['Player'] == matched_name].iloc[0]
     player_dict = player_row.to_dict()
     
-    # Replace all NaN with 0
     return {k: (0 if pd.isna(v) else v) for k, v in player_dict.items()}

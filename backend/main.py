@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 import os
 import io
 import json
@@ -44,8 +44,6 @@ class SimulateRequest(BaseModel):
     games_played: int = 82
     mpg: float = 30.0
 
-from typing import Dict, List, Optional, Union
-
 class ValueRequest(BaseModel):
     wins_added: float
     requested_salary_m: float
@@ -66,29 +64,32 @@ class CompareRequest(BaseModel):
     current_team_wins: int = 38
     requested_salary_m: float = 20.0
 
+class TradeRequest(BaseModel):
+    player_out: str
+    player_in: str
+    current_team_wins: int = 38
+
+
 # Startup event
 @app.on_event("startup")
 async def startup():
-    """Trigger data load (it happens at import, this just confirms)"""
     print(f"✅ GoldenScout ready — {len(player_list)} players loaded")
 
-# Routes
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {
-        "status": "ok",
-        "players_loaded": len(player_list)
-    }
+    return {"status": "ok", "players_loaded": len(player_list)}
+
 
 @app.get("/players")
 async def get_players():
-    """Get sorted list of all player names"""
     return player_list
+
 
 @app.get("/player/{name}/profile")
 async def get_player_profile(name: str):
-    """Get complete player profile"""
     try:
         profile = build_full_profile(name)
         return profile
@@ -97,9 +98,9 @@ async def get_player_profile(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/simulate")
 async def simulate(request: SimulateRequest):
-    """Run Monte Carlo simulation"""
     try:
         result = simulate_season(
             impact_score=request.impact_score,
@@ -110,6 +111,7 @@ async def simulate(request: SimulateRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/value")
 async def value(request: ValueRequest):
@@ -125,14 +127,15 @@ async def value(request: ValueRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/report")
 async def report(request: ReportRequest):
-    """Generate AI report"""
     try:
         result = generate_report(request.computed_results)
         return result
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
+
 
 @app.post("/audio")
 async def audio(req: AudioRequest):
@@ -144,46 +147,61 @@ async def audio(req: AudioRequest):
     except Exception:
         return {"fallback": True, "text": req.text}
 
+
 @app.get("/compare")
-async def compare(player1: str, player2: str, current_team_wins: int = 38, requested_salary_m: float = 20.0):
-    """Compare two players head-to-head"""
+async def compare(
+    player1: str,
+    player2: str,
+    current_team_wins: int = 38,
+    requested_salary_m: float = 20.0,
+):
     try:
-        # Get both profiles
         profile1 = build_full_profile(player1)
         profile2 = build_full_profile(player2)
-        
-        # Run simulations for both (pass gp/mpg for small-sample discount)
-        sim1 = simulate_season(profile1["impact_score"], current_team_wins,
-                               games_played=profile1["gp"], mpg=profile1["stats"]["mp"])
-        sim2 = simulate_season(profile2["impact_score"], current_team_wins,
-                               games_played=profile2["gp"], mpg=profile2["stats"]["mp"])
-        
-        # Calculate values
-        val1 = calculate_value(sim1["wins_added"], requested_salary_m)
-        val2 = calculate_value(sim2["wins_added"], requested_salary_m)
-        
-        # Build comparison dict for Gemini
+
+        sim1 = simulate_season(
+            profile1["impact_score"], current_team_wins,
+            games_played=profile1["gp"], mpg=profile1["stats"]["mp"]
+        )
+        sim2 = simulate_season(
+            profile2["impact_score"], current_team_wins,
+            games_played=profile2["gp"], mpg=profile2["stats"]["mp"]
+        )
+
+        # ── Pass age + gp so durability discount is applied ──
+        val1 = calculate_value(
+            wins_added=sim1["wins_added"],
+            requested_salary_m=requested_salary_m,
+            age=profile1.get("age", 0),
+            gp=profile1["gp"],
+        )
+        val2 = calculate_value(
+            wins_added=sim2["wins_added"],
+            requested_salary_m=requested_salary_m,
+            age=profile2.get("age", 0),
+            gp=profile2["gp"],
+        )
+
         comparison = {
             "player1": {
                 "name": profile1["player"],
                 "impact_score": profile1["impact_score"],
                 "wins_added": sim1["wins_added"],
                 "efficiency_ratio": val1["efficiency_ratio"],
-                "decision": val1["decision"]
+                "decision": val1["decision"],
             },
             "player2": {
                 "name": profile2["player"],
                 "impact_score": profile2["impact_score"],
                 "wins_added": sim2["wins_added"],
                 "efficiency_ratio": val2["efficiency_ratio"],
-                "decision": val2["decision"]
+                "decision": val2["decision"],
             },
-            "requested_salary_m": requested_salary_m
+            "requested_salary_m": requested_salary_m,
         }
-        
-        # Generate head-to-head report
+
         h2h_report = generate_report(comparison)
-        
+
         return {
             "player1_profile": profile1,
             "player2_profile": profile2,
@@ -191,23 +209,17 @@ async def compare(player1: str, player2: str, current_team_wins: int = 38, reque
             "player2_simulation": sim2,
             "player1_valuation": val1,
             "player2_valuation": val2,
-            "head_to_head_report": h2h_report
+            "head_to_head_report": h2h_report,
         }
-        
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
 
-class TradeRequest(BaseModel):
-    player_out: str
-    player_in: str
-    current_team_wins: int = 38
 
 @app.post("/trade")
 async def trade(request: TradeRequest):
-    """Simulate win distribution shift from trading player_out for player_in"""
     try:
         result = simulate_trade(
             player_out=request.player_out,
@@ -219,6 +231,7 @@ async def trade(request: TradeRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
