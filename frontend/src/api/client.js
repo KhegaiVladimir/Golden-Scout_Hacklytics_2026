@@ -15,10 +15,10 @@ export const fetchProfile = async (name) => {
   } catch { return null }
 }
 
-export const runSimulation = async (impact_score, current_team_wins) => {
+export const runSimulation = async (impact_score, current_team_wins, games_played = 82, mpg = 30.0) => {
   if (USE_MOCK) return mockSimulation
   try {
-    return (await api.post('/simulate', { impact_score, current_team_wins })).data
+    return (await api.post('/simulate', { impact_score, current_team_wins, games_played, mpg })).data
   } catch { return null }
 }
 

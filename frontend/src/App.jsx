@@ -80,7 +80,7 @@ export default function App() {
       return
     }
 
-    const sim = await runSimulation(profile.impact_score, teamWins)
+    const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, profile.stats?.mp ?? 30)
     const val = await calculateValue(sim?.wins_added ?? 0, salaryAsk)
     const rep = await generateReport({
       player:           profile.player,
