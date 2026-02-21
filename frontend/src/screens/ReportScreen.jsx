@@ -8,23 +8,21 @@ export default function ReportScreen({ data, onBack }) {
   return (
     <main className="max-w-3xl mx-auto px-6 py-8 fade-up">
 
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-2xl font-bold text-scout-text">Executive Report</h2>
-          <span className="font-mono text-[10px] text-scout-muted border border-scout-border rounded px-2 py-0.5">
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-1">
+          <h2 className="text-3xl font-bold text-scout-text">Executive Report</h2>
+          <span className="font-mono text-[10px] text-scout-muted border border-scout-border rounded-lg px-2.5 py-1 bg-scout-card">
             Powered by Gemini
           </span>
         </div>
         <p className="font-mono text-sm text-scout-muted">{profile.player}</p>
       </div>
 
-      {/* Report sections */}
-      <div className="mb-8">
+      <div className="mb-6">
         <ReportCard report={report} />
       </div>
 
-      {/* Voice */}
-      <div className="bg-scout-card rounded-xl border border-scout-border p-8 flex flex-col items-center mb-8">
+      <div className="bg-scout-card border border-scout-border rounded-2xl p-8 flex flex-col items-center mb-8 shadow-card">
         <VoiceButton
           audioSummary={report?.audio_summary ?? ''}
           playerName={profile.player}
