@@ -208,8 +208,10 @@ def _load_and_process_data():
     df_agg['USG_PCT'] = (df_agg['FGA'] + 0.44 * df_agg['FTA'] + df_agg['TOV']) / (df_agg['MP'] * 0.2 + 1)
     df_agg['USG_PCT'] = df_agg['USG_PCT'].fillna(0)
     
-    # Fill all remaining NaN with 0
+    # Fill all remaining NaN with 0 — but save Age first
+    age_backup = pd.to_numeric(df_agg['Age'], errors='coerce')
     df_agg = df_agg.fillna(0)
+    df_agg['Age'] = age_backup.fillna(0).astype(int)  # 0 = unknown age
     
     # Round numeric columns
     numeric_cols = df_agg.select_dtypes(include=[np.number]).columns

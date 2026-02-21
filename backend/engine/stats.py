@@ -77,7 +77,11 @@ def compute_impact_score(player: Dict, pos_stats: Dict) -> float:
     defense   = 0.4 * z_stl + 0.4 * z_blk - 0.2 * z_tov
     stability = 0.6 * z_mp + 0.4 * z_gp
     age       = player.get('Age', 27)
-    age_factor = max(0.0, 1.0 - abs(age - 27) / 10)
+    age = player.get('Age', 27)
+    try:
+        age_factor = max(0.0, 1.0 - abs(float(age) - 27) / 10)
+    except (TypeError, ValueError):
+        age_factor = 0.7
 
     positional_z = (
         0.35 * offense +
@@ -256,7 +260,7 @@ def build_full_profile(player_name: str) -> Dict:
         "player": player.get('Player', player_name),
         "team": player.get('Tm', 'N/A'),
         "position": player.get('Pos', 'SF'),
-        "age": player.get('Age', 'N/A'),
+        "age": player.get('Age', player.get('age', 'N/A')),
         "gp": gp,
         "impact_score": impact_score,
         "percentile": percentile,
