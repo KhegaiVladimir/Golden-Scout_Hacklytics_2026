@@ -44,10 +44,14 @@ class SimulateRequest(BaseModel):
     games_played: int = 82
     mpg: float = 30.0
 
+from typing import Dict, List, Optional, Union
+
 class ValueRequest(BaseModel):
     wins_added: float
     requested_salary_m: float
     value_per_win: float = 3.8
+    age: Optional[Union[float, str]] = None
+    gp: int = 82
 
 class ReportRequest(BaseModel):
     computed_results: Dict
@@ -109,12 +113,13 @@ async def simulate(request: SimulateRequest):
 
 @app.post("/value")
 async def value(request: ValueRequest):
-    """Calculate contract value"""
     try:
         result = calculate_value(
             wins_added=request.wins_added,
             requested_salary_m=request.requested_salary_m,
-            value_per_win=request.value_per_win
+            value_per_win=request.value_per_win,
+            age=request.age if request.age else 0,
+            gp=request.gp,
         )
         return result
     except Exception as e:

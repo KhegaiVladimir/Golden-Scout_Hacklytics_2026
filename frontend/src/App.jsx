@@ -108,7 +108,8 @@ export default function App() {
     }
 
     const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, profile.stats?.mp ?? 30)
-    const val = await calculateValue(sim?.wins_added ?? 0, salaryAsk)
+    const age = (profile.age && profile.age !== 'N/A') ? parseFloat(profile.age) : 0
+    const val = await calculateValue(sim?.wins_added ?? 0, salaryAsk, age, profile.gp)
     const rep = await generateReport({
       player:           profile.player,
       position:         profile.position,

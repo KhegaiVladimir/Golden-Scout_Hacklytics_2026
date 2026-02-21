@@ -16,6 +16,68 @@ function ValueBar({ label, value, max, color, textColor }) {
   )
 }
 
+function InjuryRiskCard({ profile, valuation }) {
+  const { durability_score, durability_discount_pct, health_adjusted_value_m, fair_value_m } = valuation
+  const age = profile?.age && profile.age !== 'N/A' ? profile.age : '?'
+  const gp  = profile?.gp ?? 0
+
+  const riskLevel =
+    durability_discount_pct >= 20 ? { label: 'HIGH RISK',    color: 'text-scout-red',   bg: 'bg-scout-red/5 border-scout-red/20' } :
+    durability_discount_pct >= 10 ? { label: 'MODERATE',     color: 'text-scout-amber', bg: 'bg-scout-amber/5 border-scout-amber/20' } :
+                                    { label: 'LOW RISK',      color: 'text-scout-green', bg: 'bg-scout-green/5 border-scout-green/20' }
+
+  return (
+    <div className={`bg-scout-card border ${riskLevel.bg} rounded-2xl p-5 mb-5 shadow-card`}>
+      <div className="flex items-center justify-between mb-4">
+        <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px]">
+          Injury Risk Adjustment
+        </p>
+        <span className={`font-mono text-[10px] font-bold ${riskLevel.color} border ${riskLevel.bg} px-2 py-0.5 rounded-full`}>
+          {riskLevel.label}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Raw Fair Value</p>
+          <p className="font-mono text-xl font-bold text-scout-teal">${fair_value_m.toFixed(1)}M</p>
+          <p className="font-mono text-[9px] text-scout-muted mt-0.5">if healthy all season</p>
+        </div>
+        <div className="text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Durability Score</p>
+          <p className={`font-mono text-xl font-bold ${riskLevel.color}`}>{durability_score.toFixed(2)}</p>
+          <p className="font-mono text-[9px] text-scout-muted mt-0.5">
+            age {age} · {gp}/82 games
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Health-Adj. Value</p>
+          <p className={`font-mono text-xl font-bold ${riskLevel.color}`}>${health_adjusted_value_m.toFixed(1)}M</p>
+          <p className="font-mono text-[9px] text-scout-muted mt-0.5">−{durability_discount_pct}% discount</p>
+        </div>
+      </div>
+
+      {/* Visual bar showing discount */}
+      <div className="mt-4">
+        <div className="flex justify-between font-mono text-[9px] text-scout-muted mb-1">
+          <span>Health-Adjusted</span>
+          <span>Raw Fair Value</span>
+        </div>
+        <div className="h-1.5 bg-scout-border rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${(health_adjusted_value_m / fair_value_m) * 100}%`,
+              background: durability_discount_pct >= 20 ? '#EF4444' :
+                          durability_discount_pct >= 10 ? '#F59E0B' : '#10B981'
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DecisionScreen({ data, onNext, onBack }) {
   const { profile, simulation, valuation, salaryAsk } = data
   if (!profile || !valuation) return null
@@ -49,7 +111,7 @@ export default function DecisionScreen({ data, onNext, onBack }) {
         <div className="bg-scout-card border border-scout-border rounded-2xl p-5 shadow-card text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-2">Efficiency</p>
           <p className={`font-mono text-3xl font-bold ${efficiency_ratio >= 1 ? 'text-scout-green' : efficiency_ratio >= 0.7 ? 'text-scout-amber' : 'text-scout-red'}`}>
-            {efficiency_ratio.toFixed(2)}×
+            {efficiency_ratio?.toFixed(2) ?? 'N/A'}×
           </p>
           <p className="font-mono text-[10px] text-scout-muted mt-1">fair value / ask</p>
         </div>
@@ -58,9 +120,14 @@ export default function DecisionScreen({ data, onNext, onBack }) {
       {/* Value bars */}
       <div className="bg-scout-card border border-scout-border rounded-2xl p-5 mb-5 shadow-card space-y-4">
         <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px]">Value Comparison</p>
-        <ValueBar label="Fair Value"  value={fair_value_m} max={maxBar} color="#00C9E0" textColor="text-scout-teal" />
-        <ValueBar label="Salary Ask"  value={salaryAsk}    max={maxBar} color="#F5A623" textColor="text-scout-gold" />
+        <ValueBar label="Fair Value" value={fair_value_m} max={maxBar} color="#00C9E0" textColor="text-scout-teal" />
+        <ValueBar label="Salary Ask" value={salaryAsk}    max={maxBar} color="#F5A623" textColor="text-scout-gold" />
       </div>
+
+      {/* Injury Risk Pricing — the novel section */}
+      {valuation.durability_score != null && (
+        <InjuryRiskCard profile={profile} valuation={valuation} />
+      )}
 
       {/* Verdict */}
       <div className="mb-4">
@@ -74,7 +141,7 @@ export default function DecisionScreen({ data, onNext, onBack }) {
       </div>
 
       <p className="font-mono text-[10px] text-scout-muted text-center mb-2">
-        Berri & Schmidt (2010) — 1 marginal win ≈ $3.8M team value
+        Berri & Schmidt (2010) — 1 marginal win ≈ $3.8M · Durability model: GP/82 × age curve
       </p>
       {decision === 'NEGOTIATE' && (
         <p className="font-mono text-xs text-scout-amber text-center mb-6">
