@@ -1,46 +1,15 @@
-const TrendBadge = ({ trend }) => {
-  const getTrendConfig = (trend) => {
-    switch (trend) {
-      case 'HOT':
-        return {
-          text: '↑ HOT',
-          bgColor: 'bg-red-100',
-          textColor: 'text-red-800',
-          borderColor: 'border-red-300',
-        }
-      case 'COLD':
-        return {
-          text: '↓ COLD',
-          bgColor: 'bg-blue-100',
-          textColor: 'text-blue-800',
-          borderColor: 'border-blue-300',
-        }
-      case 'STEADY':
-        return {
-          text: '→ STEADY',
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-800',
-          borderColor: 'border-gray-300',
-        }
-      default:
-        return {
-          text: '→ STEADY',
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-800',
-          borderColor: 'border-gray-300',
-        }
-    }
-  }
+const CONFIG = {
+  TRENDING_UP:   { icon: '↑', label: 'HOT STREAK', cls: 'bg-green-900/50 text-green-300 border-green-700' },
+  TRENDING_DOWN: { icon: '↓', label: 'COLD SPELL',  cls: 'bg-red-900/50   text-red-300   border-red-700'   },
+  STEADY:        { icon: '→', label: 'STEADY',       cls: 'bg-slate-800    text-slate-300  border-slate-600' },
+}
 
-  const config = getTrendConfig(trend)
-
+export default function TrendBadge({ trend }) {
+  const cfg = CONFIG[trend] || CONFIG.STEADY
   return (
-    <span
-      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${config.bgColor} ${config.textColor} ${config.borderColor}`}
-    >
-      {config.text}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-mono text-xs uppercase tracking-wider ${cfg.cls}`}>
+      <span>{cfg.icon}</span>
+      {cfg.label}
     </span>
   )
 }
-
-export default TrendBadge

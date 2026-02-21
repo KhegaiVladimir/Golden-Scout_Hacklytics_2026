@@ -1,49 +1,44 @@
 import axios from 'axios'
+import { USE_MOCK, mockProfile, mockSimulation, mockValuation, mockReport } from '../mockData'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const api = axios.create({ baseURL: 'http://localhost:8000' })
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-export const searchPlayers = async (query) => {
-  const response = await client.post('/api/search', { query })
-  return response.data
+export const fetchPlayers = async () => {
+  if (USE_MOCK) return ["Jayson Tatum", "LeBron James", "Stephen Curry"]
+  try { return (await api.get('/players')).data } catch { return [] }
 }
 
-export const getPlayer = async (playerName) => {
-  const response = await client.get(`/api/player/${encodeURIComponent(playerName)}`)
-  return response.data
+export const fetchProfile = async (name) => {
+  if (USE_MOCK) return mockProfile
+  try {
+    return (await api.get(`/player/${encodeURIComponent(name)}/profile`)).data
+  } catch { return null }
 }
 
-export const analyzePlayer = async (playerName, contractValue, contractYears) => {
-  const response = await client.post('/api/analyze', {
-    player_name: playerName,
-    contract_value: contractValue,
-    contract_years: contractYears,
-  })
-  return response.data
+export const runSimulation = async (impact_score, current_team_wins) => {
+  if (USE_MOCK) return mockSimulation
+  try {
+    return (await api.post('/simulate', { impact_score, current_team_wins })).data
+  } catch { return null }
 }
 
-export const generateReport = async (playerName, contractValue, contractYears) => {
-  const response = await client.post('/api/report', {
-    player_name: playerName,
-    contract_value: contractValue,
-    contract_years: contractYears,
-  })
-  return response.data
+export const calculateValue = async (wins_added, requested_salary_m) => {
+  if (USE_MOCK) return mockValuation
+  try {
+    return (await api.post('/value', { wins_added, requested_salary_m, value_per_win: 3.8 })).data
+  } catch { return null }
 }
 
-export const generateAudio = async (playerName, contractValue, contractYears) => {
-  const response = await client.post('/api/audio', {
-    player_name: playerName,
-    contract_value: contractValue,
-    contract_years: contractYears,
-  })
-  return response.data
+export const generateReport = async (computed_results) => {
+  if (USE_MOCK) return mockReport
+  try {
+    return (await api.post('/report', { computed_results })).data
+  } catch { return null }
 }
 
-export default client
+export const generateAudio = async (text, player_name) => {
+  try {
+    const res = await api.post('/audio', { text, player_name }, { responseType: 'blob' })
+    return URL.createObjectURL(res.data)
+  } catch { return null }
+}
