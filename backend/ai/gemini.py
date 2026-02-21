@@ -90,7 +90,7 @@ def generate_report_fallback(computed_results: dict) -> dict:
     impact = float(computed_results.get('impact_score', 0))
     wins = float(computed_results.get('wins_added', 0))
     fair_value = float(computed_results.get('fair_value_m', 0))
-    salary = float(computed_results.get('salary_m', fair_value))
+    salary = float(computed_results.get('requested_salary_m', computed_results.get('salary_m', fair_value)))
 
     if impact > 1.5:
         tier, action = "elite contributor", "strongly recommend signing"
