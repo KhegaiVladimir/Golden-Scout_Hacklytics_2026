@@ -77,7 +77,7 @@ def _load_and_process_data():
     
     # Aggregate per player
     agg_dict = {
-        'Tm': 'last',   # Most recent team (handles mid-season trades)
+        'Tm': 'last',
         'MP': 'mean',
         'FG': 'mean',
         'FGA': 'mean',
@@ -98,7 +98,7 @@ def _load_and_process_data():
         'PF': 'mean',
         'PTS': 'mean',
         'GmSc': ['mean', 'std'],
-        'Data': 'max'  # Latest game date
+        'Data': 'max'
     }
     
     df_agg = df_games.groupby('Player').agg(agg_dict).reset_index()
@@ -108,10 +108,11 @@ def _load_and_process_data():
                       'FT', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 
                       'TOV', 'PF', 'PTS', 'GmSc_mean', 'GmSc_std', 'LastGame']
     
-    # Count games played
-    gp = df_games.groupby('Player').size().reset_index(name='GP')
-    df_agg = df_agg.merge(gp, on='Player', how='left')
-    
+    # Count games from game log (fallback)
+    gp_log = df_games.groupby('Player').size().reset_index(name='GP_log')
+    df_agg = df_agg.merge(gp_log, on='Player', how='left')
+    df_agg['GP'] = df_agg['GP_log']
+
     # Calculate last 10 games GmSc
     def get_last10_gmsc(group):
         sorted_group = group.sort_values('Data').tail(10)
@@ -144,8 +145,6 @@ def _load_and_process_data():
         df_salary['Salary_M'] = df_salary['Salary'].apply(parse_salary)
     
     # Fuzzy salary merge
-    from fuzzywuzzy import process
-
     def fuzzy_salary_lookup(name, salary_dict):
         match = process.extractOne(name, salary_dict.keys(), score_cutoff=85)
         return salary_dict[match[0]] if match else 0.0
@@ -154,25 +153,46 @@ def _load_and_process_data():
     df_agg['Salary_M'] = df_agg['Player'].apply(lambda n: fuzzy_salary_lookup(n, salary_dict))
     df_agg['Salary_M'] = df_agg['Salary_M'].fillna(0.0)
     
-    # ── POSITIONS + AGE ──────────────────────────────────────────────
-    # Load positions.csv — now also pulling Age column
+    # ── POSITIONS + AGE + OFFICIAL GP ────────────────────────────────
     pos_path = os.path.join(data_dir, "position.csv")
     if os.path.exists(pos_path):
         df_pos = pd.read_csv(pos_path)
-        # Keep Player, Pos, and Age (Age may not exist in all versions)
+
+        # For traded players (multiple rows), keep the row with most games
+        if 'G' in df_pos.columns:
+            df_pos = df_pos.sort_values('G', ascending=False).drop_duplicates('Player')
+        else:
+            df_pos = df_pos.drop_duplicates('Player')
+
         cols_to_keep = ['Player', 'Pos']
         if 'Age' in df_pos.columns:
             cols_to_keep.append('Age')
-        df_pos = df_pos[cols_to_keep].drop_duplicates('Player')
+        if 'G' in df_pos.columns:
+            cols_to_keep.append('G')
+
+        df_pos = df_pos[cols_to_keep]
         df_agg = df_agg.merge(df_pos, on='Player', how='left')
+
+        # Override GP with official season totals from position.csv
+        if 'G' in df_agg.columns:
+            mask = df_agg['G'].notna() & (df_agg['G'] > 0)
+            df_agg.loc[mask, 'GP'] = df_agg.loc[mask, 'G'].astype(int)
+            df_agg = df_agg.drop(columns=['G'])
     else:
         df_agg['Pos'] = None
         df_agg['Age'] = 0
 
-    # Ensure Age column exists after merge
+    # Clean up helper column
+    df_agg = df_agg.drop(columns=['GP_log'], errors='ignore')
+
+    # Ensure Age column exists
     if 'Age' not in df_agg.columns:
         df_agg['Age'] = 0
     df_agg['Age'] = pd.to_numeric(df_agg['Age'], errors='coerce').fillna(0).astype(int)
+
+    # Ensure GP is int
+    df_agg['GP'] = pd.to_numeric(df_agg['GP'], errors='coerce').fillna(0).astype(int)
+    # ─────────────────────────────────────────────────────────────────
 
     # Fill position gaps with hardcoded POSITION_MAP
     df_agg['Pos'] = df_agg.apply(
@@ -197,7 +217,6 @@ def _load_and_process_data():
         return 'SF'
 
     df_agg['Pos'] = df_agg.apply(_infer_pos, axis=1)
-    # ─────────────────────────────────────────────────────────────────
     
     # Calculate TS%
     denominator = 2 * (df_agg['FGA'] + 0.44 * df_agg['FTA'])

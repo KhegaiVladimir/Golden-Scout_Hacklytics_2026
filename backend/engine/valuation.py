@@ -3,34 +3,89 @@ Contract valuation based on wins added, with injury risk adjustment.
 """
 from typing import Dict, Optional
 
-VALUE_PER_WIN = 3.8  # $M per win — Berri & Schmidt 2010
+VALUE_PER_WIN    = 3.8   # $M per win — Berri & Schmidt 2010
+FULL_SEASON      = 82
+INJURY_GP_THRESH = 60    # below this — likely missed games due to injury
+INJURY_MPG_THRESH = 25   # high mpg + low gp = injury, not rotation
 
 
-def _durability_score(age, gp: int) -> float:
+def _detect_absence_reason(gp: int, mpg: float) -> str:
+    """
+    Determine why a player has fewer than 82 games.
+
+    Returns:
+        'injury'   — high mpg but low gp → missed games due to injury
+        'partial'  — season still in progress or rotation player
+        'full'     — played full season
+    """
+    if gp >= FULL_SEASON:
+        return 'full'
+    if mpg >= INJURY_MPG_THRESH and gp < INJURY_GP_THRESH:
+        return 'injury'
+    return 'partial'
+
+
+def _project_wins(wins_added: float, gp: int, mpg: float) -> tuple:
+    """
+    Project wins_added to full season only if absence is NOT injury-related.
+
+    Returns (projected_wins, is_projected, absence_reason).
+    """
+    reason = _detect_absence_reason(gp, mpg)
+
+    if reason == 'injury':
+        # Don't extrapolate — player was injured, raw stats reflect true output
+        return wins_added, False, reason
+
+    if reason == 'partial':
+        # Season in progress or rotation — scale up
+        projected = round(wins_added * (FULL_SEASON / gp), 2) if gp > 0 else wins_added
+        return projected, True, reason
+
+    # Full season
+    return wins_added, False, reason
+
+
+def _durability_score(age, gp: int) -> tuple:
     """
     Compute a durability multiplier in [0, 1] based on age and games played.
-    GP/82 gives availability ratio; age curve discounts for injury-prone years.
+    Returns (score, risk_label).
     """
-    # Age factor
     if age is None or age == 'N/A' or age == 0:
-        age_factor = 0.95  # unknown age — slight conservative discount
+        age_factor = 0.95
+        age_val = None
     else:
-        age = float(age)
-        if age < 27:
+        age_val = float(age)
+        if age_val < 27:
             age_factor = 1.00
-        elif age < 31:
+        elif age_val < 31:
             age_factor = 0.97
-        elif age < 34:
+        elif age_val < 34:
             age_factor = 0.92
-        elif age < 37:
+        elif age_val < 37:
             age_factor = 0.85
         else:
             age_factor = 0.75
 
-    # Availability ratio (cap at 1.0 for players who played all 82)
     availability = min(1.0, gp / 82) if gp and gp > 0 else 0.5
+    score = round(availability * age_factor, 3)
 
-    return round(availability * age_factor, 3)
+    if score >= 0.85:
+        risk_label = "LOW RISK"
+    elif score >= 0.70:
+        risk_label = "MODERATE RISK"
+    elif score >= 0.50:
+        if age_val is not None and age_val < 27:
+            risk_label = "INJURY SEASON"
+        else:
+            risk_label = "HIGH RISK"
+    else:
+        if age_val is not None and age_val < 27:
+            risk_label = "HIGH RISK"
+        else:
+            risk_label = "VERY HIGH RISK"
+
+    return score, risk_label
 
 
 def calculate_value(
@@ -39,57 +94,36 @@ def calculate_value(
     value_per_win: float = VALUE_PER_WIN,
     age=None,
     gp: int = 82,
+    mpg: float = 30.0,
 ) -> Dict:
-    """
-    Calculate contract value, efficiency, and health-adjusted value.
+    projected_wins, is_projected, absence_reason = _project_wins(wins_added, gp, mpg)
 
-    Args:
-        wins_added:          Expected wins added by player
-        requested_salary_m:  Requested salary in millions
-        value_per_win:       Dollar value per win (default 3.8)
-        age:                 Player age (for durability discount)
-        gp:                  Games played (for availability ratio)
-    """
-    fair_value = round(wins_added * value_per_win, 2)
-
-    # Compute durability regardless of other edge cases
-    dur_score = _durability_score(age, gp)
+    fair_value = round(projected_wins * value_per_win, 2)
+    dur_score, risk_label = _durability_score(age, gp)
     health_adjusted_value = round(fair_value * dur_score, 2)
     durability_discount_pct = round((1 - dur_score) * 100, 1)
 
-    # Negative or zero wins → no value, AVOID
-    if wins_added <= 0 or fair_value <= 0:
-        return {
-            "fair_value_m":             0.0,
-            "efficiency_ratio":         None,
-            "overpay_pct":              None,
-            "decision":                 "AVOID",
-            "durability_score":         dur_score,
-            "durability_discount_pct":  durability_discount_pct,
-            "health_adjusted_value_m":  0.0,
-        }
+    base = {
+        "durability_score":         dur_score,
+        "durability_discount_pct":  durability_discount_pct,
+        "risk_label":               risk_label,
+        "projected_wins":           projected_wins,
+        "is_projected":             is_projected,
+        "absence_reason":           absence_reason,
+    }
 
-    # Handle edge cases for salary
+    if projected_wins <= 0 or fair_value <= 0:
+        return {**base, "fair_value_m": 0.0, "efficiency_ratio": None,
+                "overpay_pct": None, "decision": "AVOID", "health_adjusted_value_m": 0.0}
+
     if requested_salary_m <= 0:
-        return {
-            "fair_value_m":             fair_value,
-            "efficiency_ratio":         None,
-            "overpay_pct":              None,
-            "decision":                 "NEGOTIATE",
-            "durability_score":         dur_score,
-            "durability_discount_pct":  durability_discount_pct,
-            "health_adjusted_value_m":  health_adjusted_value,
-        }
+        return {**base, "fair_value_m": fair_value, "efficiency_ratio": None,
+                "overpay_pct": None, "decision": "NEGOTIATE",
+                "health_adjusted_value_m": health_adjusted_value}
 
     efficiency_ratio = round(fair_value / requested_salary_m, 3)
-
     overpay_raw = (requested_salary_m - fair_value) / fair_value * 100
-    if overpay_raw > 9999:
-        overpay_pct = None
-    else:
-        overpay_pct = round(overpay_raw, 1)
-
-    # Decision uses health-adjusted value for more conservative signal
+    overpay_pct = None if overpay_raw > 9999 else round(overpay_raw, 1)
     health_efficiency = round(health_adjusted_value / requested_salary_m, 3)
 
     if health_efficiency >= 1.0:
@@ -100,11 +134,10 @@ def calculate_value(
         decision = "AVOID"
 
     return {
+        **base,
         "fair_value_m":             fair_value,
         "efficiency_ratio":         efficiency_ratio,
         "overpay_pct":              overpay_pct,
         "decision":                 decision,
-        "durability_score":         dur_score,
-        "durability_discount_pct":  durability_discount_pct,
         "health_adjusted_value_m":  health_adjusted_value,
     }
