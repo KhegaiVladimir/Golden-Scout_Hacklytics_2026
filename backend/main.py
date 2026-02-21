@@ -18,6 +18,7 @@ from engine.simulation import simulate_season
 from engine.valuation import calculate_value
 from ai.gemini import generate_report
 from ai.elevenlabs import generate_audio
+from engine.trade import simulate_trade
 
 load_dotenv()
 
@@ -188,6 +189,27 @@ async def compare(player1: str, player2: str, current_team_wins: int = 38, reque
             "head_to_head_report": h2h_report
         }
         
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+class TradeRequest(BaseModel):
+    player_out: str
+    player_in: str
+    current_team_wins: int = 38
+
+@app.post("/trade")
+async def trade(request: TradeRequest):
+    """Simulate win distribution shift from trading player_out for player_in"""
+    try:
+        result = simulate_trade(
+            player_out=request.player_out,
+            player_in=request.player_in,
+            current_team_wins=request.current_team_wins,
+        )
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

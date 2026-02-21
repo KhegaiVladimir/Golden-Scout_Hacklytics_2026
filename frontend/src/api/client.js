@@ -42,3 +42,9 @@ export const generateAudio = async (text, player_name) => {
     return URL.createObjectURL(res.data)
   } catch { return null }
 }
+
+export const simulateTrade = async (player_out, player_in, current_team_wins) => {
+  try {
+    return (await api.post('/trade', { player_out, player_in, current_team_wins })).data
+  } catch { return null }
+}

@@ -1,17 +1,20 @@
-import { useState } from 'react'
-import { fetchProfile, runSimulation, calculateValue, generateReport } from './api/client'
+import { useState, useEffect } from 'react'
+import { fetchProfile, runSimulation, calculateValue, generateReport, fetchPlayers } from './api/client'
 import SearchScreen     from './screens/SearchScreen'
 import ProfileScreen    from './screens/ProfileScreen'
 import SimulationScreen from './screens/SimulationScreen'
 import DecisionScreen   from './screens/DecisionScreen'
 import ReportScreen     from './screens/ReportScreen'
+import TradeScreen      from './screens/TradeScreen'
 
 const STEPS = ['Profile', 'Simulation', 'Decision', 'Report']
 const STEP_SCREENS = ['profile', 'simulation', 'decision', 'report']
 
 function NavBar({ screen, onNavigate }) {
   const currentIdx = STEP_SCREENS.indexOf(screen)
-  if (currentIdx === -1) return null
+  const isTradeScreen = screen === 'trade'
+
+  if (currentIdx === -1 && !isTradeScreen) return null
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-scout-border/60 bg-scout-bg/80 backdrop-blur-xl">
@@ -23,36 +26,54 @@ function NavBar({ screen, onNavigate }) {
           GOLDEN SCOUT
         </button>
 
-        <nav className="flex items-center">
-          {STEPS.map((step, i) => {
-            const done   = i < currentIdx
-            const active = i === currentIdx
-            return (
-              <button
-                key={step}
-                onClick={() => done && onNavigate(STEP_SCREENS[i])}
-                disabled={!done && !active}
-                className={`relative px-4 py-4 font-mono text-xs tracking-widest uppercase transition-all
-                  ${active   ? 'text-scout-teal' : ''}
-                  ${done     ? 'text-scout-gold cursor-pointer hover:text-scout-gold/70' : ''}
-                  ${!done && !active ? 'text-scout-muted cursor-default' : ''}
-                `}
-              >
-                {done ? <span className="mr-1">✓</span> : null}
-                {step}
-                {active && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-scout-teal rounded-full" />
-                )}
-                {i < STEPS.length - 1 && (
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-scout-border text-xs">›</span>
-                )}
-              </button>
-            )
-          })}
-        </nav>
+        {isTradeScreen ? (
+          <div className="font-mono text-xs text-scout-teal uppercase tracking-widest border border-scout-teal/30 px-3 py-1 rounded-full">
+            Trade Simulator
+          </div>
+        ) : (
+          <nav className="flex items-center">
+            {STEPS.map((step, i) => {
+              const done   = i < currentIdx
+              const active = i === currentIdx
+              return (
+                <button
+                  key={step}
+                  onClick={() => done && onNavigate(STEP_SCREENS[i])}
+                  disabled={!done && !active}
+                  className={`relative px-4 py-4 font-mono text-xs tracking-widest uppercase transition-all
+                    ${active   ? 'text-scout-teal' : ''}
+                    ${done     ? 'text-scout-gold cursor-pointer hover:text-scout-gold/70' : ''}
+                    ${!done && !active ? 'text-scout-muted cursor-default' : ''}
+                  `}
+                >
+                  {done ? <span className="mr-1">✓</span> : null}
+                  {step}
+                  {active && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-scout-teal rounded-full" />
+                  )}
+                  {i < STEPS.length - 1 && (
+                    <span className="absolute right-0 top-1/2 -translate-y-1/2 text-scout-border text-xs">›</span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+        )}
 
-        <div className="font-mono text-xs text-scout-muted w-28 text-right truncate">
-          {screen !== 'search' ? sessionStorage.getItem('playerName') : ''}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => onNavigate('trade')}
+            className={`font-mono text-xs uppercase tracking-widest transition-colors px-3 py-1 rounded-lg
+              ${isTradeScreen
+                ? 'text-scout-teal border border-scout-teal/30'
+                : 'text-scout-muted hover:text-scout-teal'
+              }`}
+          >
+            Trade Sim
+          </button>
+          <div className="font-mono text-xs text-scout-muted w-28 text-right truncate">
+            {screen !== 'search' && screen !== 'trade' ? sessionStorage.getItem('playerName') : ''}
+          </div>
         </div>
       </div>
     </header>
@@ -61,12 +82,18 @@ function NavBar({ screen, onNavigate }) {
 
 export default function App() {
   const [screen, setScreen] = useState('search')
+  const [players, setPlayers] = useState([])
   const [playerData, setPlayerData] = useState({
     profile: null, simulation: null, valuation: null, report: null,
     teamWins: 38, salaryAsk: 20,
   })
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
+
+  // Load player list once on mount
+  useEffect(() => {
+    fetchPlayers().then(setPlayers)
+  }, [])
 
   const handleEvaluate = async (playerName, teamWins, salaryAsk) => {
     setLoading(true)
@@ -111,11 +138,12 @@ export default function App() {
     <div className="min-h-screen bg-scout-bg relative">
       <NavBar screen={screen} onNavigate={nav} />
       <div className={isSearch ? '' : 'pt-14'}>
-        {screen === 'search'     && <SearchScreen    onEvaluate={handleEvaluate} loading={loading} error={error} />}
-        {screen === 'profile'    && <ProfileScreen   data={playerData} onNext={() => nav('simulation')} onBack={() => nav('search')} />}
-        {screen === 'simulation' && <SimulationScreen data={playerData} onNext={() => nav('decision')}  onBack={() => nav('profile')} />}
-        {screen === 'decision'   && <DecisionScreen  data={playerData} onNext={() => nav('report')}     onBack={() => nav('simulation')} />}
-        {screen === 'report'     && <ReportScreen    data={playerData} onBack={() => nav('decision')} />}
+        {screen === 'search'     && <SearchScreen     onEvaluate={handleEvaluate} loading={loading} error={error} />}
+        {screen === 'profile'    && <ProfileScreen    data={playerData} onNext={() => nav('simulation')} onBack={() => nav('search')} />}
+        {screen === 'simulation' && <SimulationScreen data={playerData} onNext={() => nav('decision')}   onBack={() => nav('profile')} />}
+        {screen === 'decision'   && <DecisionScreen   data={playerData} onNext={() => nav('report')}     onBack={() => nav('simulation')} />}
+        {screen === 'report'     && <ReportScreen     data={playerData} onBack={() => nav('decision')} />}
+        {screen === 'trade'      && <TradeScreen      onBack={() => nav('search')} players={players} />}
       </div>
     </div>
   )
