@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchProfile, runSimulation, calculateValue } from '../api/client'
+import { fetchProfile, runSimulation, calculateValue, generateCompareVerdict } from '../api/client'
 
 function fmtMoney(v) {
   if (v == null) return 'N/A'
   return v < 0 ? `-$${Math.abs(v).toFixed(1)}M` : `$${v.toFixed(1)}M`
 }
 
-// Same PlayerSearch as TradeScreen — with useRef for outside click
 function PlayerSearch({ label, value, onChange, players, salary, onSalary }) {
   const [query, setQuery]       = useState(value || '')
   const [open, setOpen]         = useState(false)
@@ -110,13 +109,15 @@ function RiskLabel({ value }) {
 }
 
 export default function CompareScreen({ onBack, players }) {
-  const [name1, setName1]     = useState('')
-  const [name2, setName2]     = useState('')
-  const [salary1, setSalary1] = useState(20)
-  const [salary2, setSalary2] = useState(20)
-  const [result, setResult]   = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
+  const [name1, setName1]       = useState('')
+  const [name2, setName2]       = useState('')
+  const [salary1, setSalary1]   = useState(20)
+  const [salary2, setSalary2]   = useState(20)
+  const [result, setResult]     = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState(null)
+  const [aiVerdict, setAiVerdict]   = useState(null)
+  const [aiLoading, setAiLoading]   = useState(false)
 
   const canRun = name1 && name2 && name1 !== name2
 
@@ -125,6 +126,7 @@ export default function CompareScreen({ onBack, players }) {
     setLoading(true)
     setError(null)
     setResult(null)
+    setAiVerdict(null)
 
     try {
       const [p1, p2] = await Promise.all([fetchProfile(name1), fetchProfile(name2)])
@@ -141,7 +143,36 @@ export default function CompareScreen({ onBack, players }) {
         calculateValue(sim2.wins_added, salary2, p2.age ?? 0, p2.gp, p2.stats?.mp ?? 30),
       ])
 
-      setResult({ p1, p2, sim1, sim2, val1, val2 })
+      const newResult = { p1, p2, sim1, sim2, val1, val2 }
+      setResult(newResult)
+
+      // Fire AI verdict async — doesn't block the UI
+      setAiLoading(true)
+      generateCompareVerdict(
+        {
+          name: p1.player,
+          wins_added: sim1.wins_added,
+          fair_value_m: val1.fair_value_m,
+          salary_m: salary1,
+          efficiency_ratio: val1.efficiency_ratio ?? 0,
+          health_adj_m: val1.health_adjusted_value_m,
+          decision: val1.decision,
+        },
+        {
+          name: p2.player,
+          wins_added: sim2.wins_added,
+          fair_value_m: val2.fair_value_m,
+          salary_m: salary2,
+          efficiency_ratio: val2.efficiency_ratio ?? 0,
+          health_adj_m: val2.health_adjusted_value_m,
+          decision: val2.decision,
+        }
+      ).then(v => {
+        if (v?.verdict) setAiVerdict(v.verdict)
+        else if (typeof v === 'string') setAiVerdict(v)
+        setAiLoading(false)
+      }).catch(() => setAiLoading(false))
+
     } catch (e) {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -215,6 +246,21 @@ export default function CompareScreen({ onBack, players }) {
                 Health-adjusted value: {fmtMoney(winner === 1 ? result.val1.health_adjusted_value_m : result.val2.health_adjusted_value_m)}
                 {' · '}salary ask: ${winner === 1 ? salary1 : salary2}M
               </p>
+
+              {/* AI Verdict */}
+              <div className="mt-4 pt-4 border-t border-scout-teal/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="font-mono text-[9px] text-scout-teal/60 uppercase tracking-widest">AI Analysis</span>
+                  <span className="font-mono text-[9px] text-scout-muted uppercase tracking-widest">· Powered by Gemini</span>
+                </div>
+                {aiLoading ? (
+                  <p className="font-mono text-xs text-scout-muted animate-pulse">Generating analysis...</p>
+                ) : aiVerdict ? (
+                  <p className="font-mono text-sm text-scout-text leading-relaxed max-w-lg mx-auto">
+                    {aiVerdict}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             {/* Head to head table */}
@@ -225,22 +271,20 @@ export default function CompareScreen({ onBack, players }) {
                 <p className="font-mono text-sm font-bold text-scout-gold text-left truncate">{result.p2.player}</p>
               </div>
 
-              {/* Decision row — no numeric compare */}
               <div className="grid grid-cols-3 gap-2 py-2 border-b border-scout-border/30">
                 <div className="text-right"><DecisionBadge decision={result.val1.decision} /></div>
                 <div className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">Decision</div>
                 <div className="text-left"><DecisionBadge decision={result.val2.decision} /></div>
               </div>
 
-              <StatRow label="Fair Value"   v1={result.val1.fair_value_m}           v2={result.val2.fair_value_m}           format={fmtMoney} />
-              <StatRow label="Salary Ask"   v1={salary1}                            v2={salary2}                            format={v => `$${v}M`} higherIsBetter={false} />
-              <StatRow label="Efficiency"   v1={result.val1.efficiency_ratio}       v2={result.val2.efficiency_ratio}       format={v => `${v?.toFixed(2)}x`} />
+              <StatRow label="Fair Value"   v1={result.val1.fair_value_m}            v2={result.val2.fair_value_m}            format={fmtMoney} />
+              <StatRow label="Salary Ask"   v1={salary1}                             v2={salary2}                             format={v => `$${v}M`} higherIsBetter={false} />
+              <StatRow label="Efficiency"   v1={result.val1.efficiency_ratio}        v2={result.val2.efficiency_ratio}        format={v => `${v?.toFixed(2)}x`} />
               <StatRow label="Health-Adj."  v1={result.val1.health_adjusted_value_m} v2={result.val2.health_adjusted_value_m} format={fmtMoney} />
-              <StatRow label="Wins Added"   v1={result.sim1.wins_added}             v2={result.sim2.wins_added}             format={v => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-              <StatRow label="Impact Score" v1={result.p1.impact_score}             v2={result.p2.impact_score}             format={v => v.toFixed(2)} />
-              <StatRow label="Durability"   v1={result.val1.durability_score}       v2={result.val2.durability_score}       format={v => v.toFixed(2)} />
+              <StatRow label="Wins Added"   v1={result.sim1.wins_added}              v2={result.sim2.wins_added}              format={v => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+              <StatRow label="Impact Score" v1={result.p1.impact_score}              v2={result.p2.impact_score}              format={v => v.toFixed(2)} />
+              <StatRow label="Durability"   v1={result.val1.durability_score}        v2={result.val2.durability_score}        format={v => v.toFixed(2)} />
 
-              {/* Risk row — no numeric compare */}
               <div className="grid grid-cols-3 gap-2 py-2 border-b border-scout-border/30">
                 <div className="text-right"><RiskLabel value={result.val1.risk_label} /></div>
                 <div className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">Risk</div>

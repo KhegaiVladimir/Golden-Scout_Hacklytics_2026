@@ -36,6 +36,12 @@ export const generateReport = async (computed_results) => {
   } catch { return null }
 }
 
+export const generateCompareVerdict = async (p1, p2) => {
+  try {
+    return (await api.post('/compare-verdict', { p1, p2 })).data
+  } catch { return null }
+}
+
 export const generateAudio = async (text, player_name) => {
   try {
     const res = await api.post('/audio', { text, player_name }, { responseType: 'blob' })
