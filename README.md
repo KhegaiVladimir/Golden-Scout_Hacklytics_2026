@@ -3,7 +3,7 @@
 
 > **Should you sign this player?** Golden Scout runs the numbers and tells you: **SIGN**, **NEGOTIATE**, or **AVOID** — with every figure explained.
 
-Built in 36 hours at Hacklytics 2026 (Georgia Tech).
+🔴 **[Live Demo →](https://golden-scout-hacklytics-2026.vercel.app/)** &nbsp;|&nbsp; Built in 36 hours at Hacklytics 2026 (Georgia Tech).
 
 ---
 
@@ -183,7 +183,6 @@ Full docs available at `/docs` when the server is running.
 - Uses 2024-25 season data only — no mid-season trades or injuries after the data cutoff
 - The $3.8M/win figure is from Berri & Schmidt (2010); NBA salaries have risen significantly since
 - Negative fair value is intentional — a player with negative wins added costs the team wins, so their contract value is negative
-- Render free tier spins down after inactivity; first request may take ~30 seconds to wake up
 
 ---
 
