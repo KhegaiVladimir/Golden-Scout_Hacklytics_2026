@@ -24,7 +24,6 @@ load_dotenv()
 
 app = FastAPI(title="Golden Scout API")
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,7 +31,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for audio cache
 audio_cache_dir = os.path.join(os.path.dirname(__file__), "audio_cache")
 os.makedirs(audio_cache_dir, exist_ok=True)
 app.mount("/audio-files", StaticFiles(directory=audio_cache_dir), name="audio_files")
@@ -50,6 +48,7 @@ class ValueRequest(BaseModel):
     value_per_win: float = 3.8
     age: Optional[Union[float, str]] = None
     gp: int = 82
+    mpg: float = 30.0  # ← добавлено
 
 class ReportRequest(BaseModel):
     computed_results: Dict
@@ -70,13 +69,10 @@ class TradeRequest(BaseModel):
     current_team_wins: int = 38
 
 
-# Startup event
 @app.on_event("startup")
 async def startup():
     print(f"✅ GoldenScout ready — {len(player_list)} players loaded")
 
-
-# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 async def root():
@@ -122,6 +118,7 @@ async def value(request: ValueRequest):
             value_per_win=request.value_per_win,
             age=request.age if request.age else 0,
             gp=request.gp,
+            mpg=request.mpg,  # ← добавлено
         )
         return result
     except Exception as e:
@@ -159,27 +156,31 @@ async def compare(
         profile1 = build_full_profile(player1)
         profile2 = build_full_profile(player2)
 
+        mpg1 = profile1["stats"]["mp"]
+        mpg2 = profile2["stats"]["mp"]
+
         sim1 = simulate_season(
             profile1["impact_score"], current_team_wins,
-            games_played=profile1["gp"], mpg=profile1["stats"]["mp"]
+            games_played=profile1["gp"], mpg=mpg1,
         )
         sim2 = simulate_season(
             profile2["impact_score"], current_team_wins,
-            games_played=profile2["gp"], mpg=profile2["stats"]["mp"]
+            games_played=profile2["gp"], mpg=mpg2,
         )
 
-        # ── Pass age + gp so durability discount is applied ──
         val1 = calculate_value(
             wins_added=sim1["wins_added"],
             requested_salary_m=requested_salary_m,
             age=profile1.get("age", 0),
             gp=profile1["gp"],
+            mpg=mpg1,  # ← добавлено
         )
         val2 = calculate_value(
             wins_added=sim2["wins_added"],
             requested_salary_m=requested_salary_m,
             age=profile2.get("age", 0),
             gp=profile2["gp"],
+            mpg=mpg2,  # ← добавлено
         )
 
         comparison = {

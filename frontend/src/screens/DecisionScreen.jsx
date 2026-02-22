@@ -1,16 +1,26 @@
 import VerdictCard from '../components/VerdictCard'
 
+// FIX: корректное отображение отрицательных денежных значений
+function fmtMoney(v) {
+  if (v == null) return 'N/A'
+  return v < 0 ? `-$${Math.abs(v).toFixed(1)}M` : `$${v.toFixed(1)}M`
+}
+
 function ValueBar({ label, value, max, color, textColor }) {
-  const pct = Math.min(100, (value / max) * 100)
+  // FIX: защита от отрицательных значений и нулевого max
+  const safeMax = Math.max(Math.abs(max), 1)
+  const pct = Math.max(0, Math.min(100, (Math.abs(value) / safeMax) * 100))
+  const isNegative = value < 0
+
   return (
     <div>
       <div className="flex justify-between font-mono text-xs mb-1.5">
         <span className="text-scout-muted uppercase tracking-wider">{label}</span>
-        <span className={textColor}>${value.toFixed(1)}M</span>
+        <span className={isNegative ? 'text-scout-red' : textColor}>{fmtMoney(value)}</span>
       </div>
       <div className="h-1.5 bg-scout-border rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: color }} />
+          style={{ width: `${pct}%`, background: isNegative ? '#EF4444' : color }} />
       </div>
     </div>
   )
@@ -41,6 +51,15 @@ function InjuryRiskCard({ profile, valuation }) {
   const label = risk_label ?? 'HIGH RISK'
   const { color, bg, barColor } = getRiskStyle(label)
 
+  // FIX: защита от деления на 0 в баре
+  const barPct = fair_value_m !== 0
+    ? Math.max(0, Math.min(100, (health_adjusted_value_m / fair_value_m) * 100))
+    : 0
+
+  const rawEfficiency = valuation.requested_salary_m > 0
+    ? (fair_value_m / valuation.requested_salary_m).toFixed(2)
+    : 'N/A'
+
   return (
     <div className={`bg-scout-card border ${bg} rounded-2xl p-5 mb-5 shadow-card`}>
       <div className="flex items-center justify-between mb-4">
@@ -55,7 +74,9 @@ function InjuryRiskCard({ profile, valuation }) {
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Raw Fair Value</p>
-          <p className="font-mono text-xl font-bold text-scout-teal">${fair_value_m.toFixed(1)}M</p>
+          <p className={`font-mono text-xl font-bold ${fair_value_m < 0 ? 'text-scout-red' : 'text-scout-teal'}`}>
+            {fmtMoney(fair_value_m)}
+          </p>
           <p className="font-mono text-[9px] text-scout-muted mt-0.5">if healthy all season</p>
         </div>
         <div className="text-center">
@@ -67,7 +88,9 @@ function InjuryRiskCard({ profile, valuation }) {
         </div>
         <div className="text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Health-Adj. Value</p>
-          <p className={`font-mono text-xl font-bold ${color}`}>${health_adjusted_value_m.toFixed(1)}M</p>
+          <p className={`font-mono text-xl font-bold ${health_adjusted_value_m < 0 ? 'text-scout-red' : color}`}>
+            {fmtMoney(health_adjusted_value_m)}
+          </p>
           <p className="font-mono text-[9px] text-scout-muted mt-0.5">-{durability_discount_pct}% discount</p>
         </div>
       </div>
@@ -81,10 +104,7 @@ function InjuryRiskCard({ profile, valuation }) {
         <div className="h-1.5 bg-scout-border rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-700"
-            style={{
-              width: `${(health_adjusted_value_m / fair_value_m) * 100}%`,
-              background: barColor,
-            }}
+            style={{ width: `${barPct}%`, background: barColor }}
           />
         </div>
       </div>
@@ -93,11 +113,15 @@ function InjuryRiskCard({ profile, valuation }) {
       <div className="mt-4 pt-4 border-t border-white/5">
         <p className="font-mono text-[10px] text-scout-muted leading-relaxed">
           <span className="text-scout-text">How it works:</span>{' '}
-          Efficiency {((fair_value_m / (valuation.requested_salary_m || 1))).toFixed(2)}x is calculated using{' '}
-          <span className="text-scout-teal">raw fair value ${fair_value_m.toFixed(1)}M</span> —
+          Efficiency {rawEfficiency}x is calculated using{' '}
+          <span className={fair_value_m < 0 ? 'text-scout-red' : 'text-scout-teal'}>
+            raw fair value {fmtMoney(fair_value_m)}
+          </span> —
           what the player is worth if healthy all season.
           The verdict is based on{' '}
-          <span className={color}>health-adjusted value ${health_adjusted_value_m.toFixed(1)}M</span> —
+          <span className={health_adjusted_value_m < 0 ? 'text-scout-red' : color}>
+            health-adjusted value {fmtMoney(health_adjusted_value_m)}
+          </span> —
           real value accounting for the risk of missed games
           (age {age} · {gp}/82 games · {durability_discount_pct}% discount).
         </p>
@@ -117,13 +141,23 @@ export default function DecisionScreen({ data, onNext, onBack }) {
 
   const wins_added = simulation?.wins_added ?? 0
   const gp = profile?.gp ?? 82
-  const mpg = profile?.mpg?.toFixed(1) ?? '?'
-  const maxBar = Math.max(fair_value_m, salaryAsk) * 1.2
+  const mpg = (profile?.stats?.mp ?? profile?.mpg)?.toFixed(1) ?? '?'
+  // FIX: maxBar корректно работает с отрицательными fair_value
+  const maxBar = Math.max(Math.abs(fair_value_m), salaryAsk, 1) * 1.2
 
   const hasRisk = valuation.durability_discount_pct > 10
   const efficiencyNote = hasRisk
-    ? `based on raw value · health-adj. ${(health_adjusted_value_m / salaryAsk).toFixed(2)}x`
+    ? `based on raw value · health-adj. ${health_adjusted_value_m != null && salaryAsk > 0 ? (health_adjusted_value_m / salaryAsk).toFixed(2) : 'N/A'}x`
     : 'fair value / ask'
+
+  // FIX: цвет efficiency с учётом отрицательных значений
+  const efficiencyColor = efficiency_ratio == null
+    ? 'text-scout-muted'
+    : efficiency_ratio >= 1
+      ? 'text-scout-green'
+      : efficiency_ratio >= 0.7
+        ? 'text-scout-amber'
+        : 'text-scout-red'
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8 fade-up">
@@ -167,7 +201,9 @@ export default function DecisionScreen({ data, onNext, onBack }) {
       <div className="grid grid-cols-3 gap-4 mb-5">
         <div className="bg-scout-card border border-scout-border rounded-2xl p-5 shadow-card text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-2">Fair Value</p>
-          <p className="font-mono text-3xl font-bold text-scout-teal">${fair_value_m.toFixed(1)}M</p>
+          <p className={`font-mono text-3xl font-bold ${fair_value_m < 0 ? 'text-scout-red' : 'text-scout-teal'}`}>
+            {fmtMoney(fair_value_m)}
+          </p>
           <p className="font-mono text-[10px] text-scout-muted mt-1">
             {projected_wins?.toFixed(1) ?? wins_added.toFixed(1)} wins × $3.8M
             {is_projected && <span className="text-scout-amber"> (proj.)</span>}
@@ -180,8 +216,8 @@ export default function DecisionScreen({ data, onNext, onBack }) {
         </div>
         <div className="bg-scout-card border border-scout-border rounded-2xl p-5 shadow-card text-center">
           <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-2">Efficiency</p>
-          <p className={`font-mono text-3xl font-bold ${efficiency_ratio >= 1 ? 'text-scout-green' : efficiency_ratio >= 0.7 ? 'text-scout-amber' : 'text-scout-red'}`}>
-            {efficiency_ratio?.toFixed(2) ?? 'N/A'}x
+          <p className={`font-mono text-3xl font-bold ${efficiencyColor}`}>
+            {efficiency_ratio != null ? `${efficiency_ratio.toFixed(2)}x` : 'N/A'}
           </p>
           <p className="font-mono text-[9px] text-scout-muted mt-1">{efficiencyNote}</p>
         </div>
@@ -221,7 +257,7 @@ export default function DecisionScreen({ data, onNext, onBack }) {
 
       {decision === 'NEGOTIATE' && (
         <p className="font-mono text-xs text-scout-amber text-center mb-6">
-          Suggested range: ${(fair_value_m * 0.95).toFixed(1)}M – ${(fair_value_m * 1.05).toFixed(1)}M
+          Suggested range: {fmtMoney(fair_value_m * 0.95)} – {fmtMoney(fair_value_m * 1.05)}
         </p>
       )}
 

@@ -10,10 +10,8 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 MODEL = 'gemini-2.5-flash'
 
-# In-memory cache for the current session
 report_cache = {}
 
-# File-based cache: persists across server restarts
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -26,11 +24,9 @@ def _cache_file(cache_key: str) -> str:
 def generate_report(computed_results: dict) -> dict:
     cache_key = json.dumps(computed_results, sort_keys=True, default=str)
 
-    # 1. In-memory hit
     if cache_key in report_cache:
         return report_cache[cache_key]
 
-    # 2. File-based hit
     fpath = _cache_file(cache_key)
     if os.path.exists(fpath):
         with open(fpath, "r") as f:
@@ -38,16 +34,66 @@ def generate_report(computed_results: dict) -> dict:
         report_cache[cache_key] = result
         return result
 
-    prompt = f"""You are an NBA front office analyst. Based on this player data, write a brief scouting report in under 150 words total.
+    d = computed_results
+    player        = d.get('player', 'This player')
+    position      = d.get('position', 'N/A')
+    impact        = d.get('impact_score', 0)
+    percentile    = d.get('percentile', 'N/A')
+    trend         = d.get('trend_signal', 'N/A')
+    wins_added    = d.get('wins_added', 0)
+    proj_wins     = d.get('projected_wins', wins_added)
+    is_projected  = d.get('is_projected', False)
+    fair_value    = d.get('fair_value_m', 0)
+    salary        = d.get('requested_salary_m', fair_value)
+    efficiency    = d.get('efficiency_ratio', None)
+    overpay       = d.get('overpay_pct', None)
+    decision      = d.get('decision', 'NEGOTIATE')
+    absence       = d.get('absence_reason', 'full')
+    playoff_prob  = d.get('playoff_prob', None)
+    expected_wins = d.get('expected_wins', None)
 
-Data: {json.dumps(computed_results, default=str)}
+    wins_line = (
+        f"{proj_wins:.1f} projected wins (extrapolated from {wins_added:.1f} raw)"
+        if is_projected else f"{wins_added:.1f} wins added"
+    )
+    value_line = (
+        f"fair value ${fair_value:.1f}M vs ${salary:.1f}M ask "
+        f"(efficiency {efficiency:.2f}x, overpay {overpay:.1f}%)"
+        if efficiency is not None and overpay is not None
+        else f"fair value ${fair_value:.1f}M vs ${salary:.1f}M ask"
+    )
+    absence_line = {
+        'injury':  "missed significant time due to injury this season — do not extrapolate stats",
+        'partial': "partial season data, stats were extrapolated to 82 games",
+        'full':    "played a full season",
+    }.get(absence, '')
 
-Respond in EXACTLY this format (each on its own line):
-VERDICT: one sentence overall assessment
-STRENGTHS: one sentence about what player does well
-CONCERN: one sentence about main risk
-RECOMMENDATION: one sentence contract advice
-AUDIO_SUMMARY: two sentences suitable for text-to-speech"""
+    prompt = f"""You are a sharp NBA front office analyst. Write a concise scouting report for a contract decision.
+
+Player: {player} ({position})
+Impact score: {impact:.2f} (percentile: {percentile}, trend: {trend})
+Wins: {wins_line}
+Value: {value_line}
+Decision: {decision}
+Season note: {absence_line}
+{"Playoff probability: " + str(round(playoff_prob, 1)) + "%" if playoff_prob else ""}
+{"Team expected wins with player: " + str(round(expected_wins, 1)) if expected_wins else ""}
+
+Rules:
+- Be specific — use the actual numbers provided
+- STRENGTHS must list 2-3 concrete positives separated by | (pipe character)
+- CONCERN must name the single biggest real risk (injury history, age regression, small sample, role dependency, etc.)
+- RECOMMENDATION must start with exactly one word: SIGN, NEGOTIATE, or AVOID
+- Never say "above league average in key categories" or other vague filler
+- If overpay_pct is negative, it means the player is UNDERVALUED (good deal), not overpriced — phrase accordingly
+- Under 160 words total
+
+Respond in EXACTLY this format:
+VERDICT: one sentence
+STRENGTHS: strength one | strength two | strength three
+CONCERN: one sentence
+RECOMMENDATION: SIGN/NEGOTIATE/AVOID followed by specific advice
+AUDIO_SUMMARY: two sentences for text-to-speech"""
 
     for attempt in range(3):
         try:
@@ -67,15 +113,16 @@ AUDIO_SUMMARY: two sentences suitable for text-to-speech"""
                 for key in ['VERDICT', 'STRENGTHS', 'CONCERN', 'RECOMMENDATION', 'AUDIO_SUMMARY']:
                     if line.startswith(f'{key}:'):
                         result[key.lower()] = line.replace(f'{key}:', '').strip()
+
             if not result['verdict']:
                 result['verdict'] = text[:300]
 
-            # Save to both caches
             report_cache[cache_key] = result
             with open(fpath, "w") as f:
                 json.dump(result, f)
 
             return result
+
         except Exception as e:
             if '429' in str(e) and attempt < 2:
                 time.sleep(10 * (attempt + 1))
@@ -86,25 +133,45 @@ AUDIO_SUMMARY: two sentences suitable for text-to-speech"""
 
 
 def generate_report_fallback(computed_results: dict) -> dict:
-    player = computed_results.get('player', 'This player')
-    impact = float(computed_results.get('impact_score', 0))
-    wins = float(computed_results.get('wins_added', 0))
-    fair_value = float(computed_results.get('fair_value_m', 0))
-    salary = float(computed_results.get('requested_salary_m', computed_results.get('salary_m', fair_value)))
+    """Fallback when Gemini is unavailable — still uses real numbers."""
+    d = computed_results
+    player       = d.get('player', 'This player')
+    impact       = float(d.get('impact_score', 0))
+    wins_added   = float(d.get('wins_added', 0))
+    proj_wins    = float(d.get('projected_wins', wins_added))
+    fair_value   = float(d.get('fair_value_m', 0))
+    salary       = float(d.get('requested_salary_m', fair_value))
+    efficiency   = d.get('efficiency_ratio')
+    overpay      = d.get('overpay_pct')
+    decision     = d.get('decision', 'NEGOTIATE')
+    absence      = d.get('absence_reason', 'full')
+    is_projected = d.get('is_projected', False)
 
-    if impact > 1.5:
-        tier, action = "elite contributor", "strongly recommend signing"
-    elif impact > 0.5:
-        tier, action = "solid starter", "recommend signing at fair value"
-    elif impact > 0:
-        tier, action = "reliable role player", "consider signing if price is right"
+    wins_str = f"{proj_wins:.1f} projected" if is_projected else f"{wins_added:.1f}"
+
+    if decision == 'SIGN':
+        action = "sign at the asking price"
+        tier = "high-value" if impact > 1.5 else "solid"
+    elif decision == 'NEGOTIATE':
+        action = f"negotiate down from ${salary:.1f}M toward fair value ${fair_value:.1f}M"
+        tier = "moderate-value"
     else:
-        tier, action = "below-average performer", "avoid unless heavily discounted"
+        action = f"avoid — fair value ${fair_value:.1f}M does not justify ${salary:.1f}M ask"
+        tier = "below-value"
+
+    eff_str = f"{efficiency:.2f}x efficiency" if efficiency is not None else "limited efficiency data"
+    overpay_str = f"{overpay:.1f}% overpay" if overpay is not None else ""
+
+    concern_map = {
+        'injury': f"Injury history is a major red flag — played just {d.get('gp', '?')} games this season",
+        'partial': f"Small sample ({d.get('gp', '?')} GP) adds projection uncertainty to the {wins_str}-win estimate",
+        'full': "Performance must sustain over a full season to justify long-term commitment",
+    }
 
     return {
-        "verdict": f"{player} is a {tier} projecting to add {wins:.1f} wins with an impact score of {impact:.1f}.",
-        "strengths": f"Efficiency metrics and positional rating place {player} above league average in key categories.",
-        "concern": f"Current salary of ${salary:.1f}M must be weighed against projected fair value of ${fair_value:.1f}M.",
-        "recommendation": f"We {action} — the numbers support this decision at current market rates.",
-        "audio_summary": f"{player} projects {wins:.1f} additional wins this season. Our analysis indicates you should {action} based on a fair value of {fair_value:.1f} million dollars."
+        "verdict": f"{player} is a {tier} addition projecting {wins_str} wins at {eff_str}.",
+        "strengths": f"Projects {wins_str} wins this season | {eff_str} relative to ${salary:.1f}M ask | {overpay_str or 'contract fits market rate'}",
+        "concern": concern_map.get(absence, "Sustainability of current production level is uncertain."),
+        "recommendation": f"{decision} — {action}.",
+        "audio_summary": f"{player} projects {wins_str} wins with a fair value of {fair_value:.1f} million dollars against a {salary:.1f} million ask. Our recommendation is to {action}."
     }

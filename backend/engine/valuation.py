@@ -34,15 +34,12 @@ def _project_wins(wins_added: float, gp: int, mpg: float) -> tuple:
     reason = _detect_absence_reason(gp, mpg)
 
     if reason == 'injury':
-        # Don't extrapolate — player was injured, raw stats reflect true output
         return wins_added, False, reason
 
     if reason == 'partial':
-        # Season in progress or rotation — scale up
         projected = round(wins_added * (FULL_SEASON / gp), 2) if gp > 0 else wins_added
         return projected, True, reason
 
-    # Full season
     return wins_added, False, reason
 
 
@@ -112,14 +109,31 @@ def calculate_value(
         "absence_reason":           absence_reason,
     }
 
+    # FIX: не обрезаем в 0 — отрицательное значение честно показывает что игрок вреден
     if projected_wins <= 0 or fair_value <= 0:
-        return {**base, "fair_value_m": 0.0, "efficiency_ratio": None,
-                "overpay_pct": None, "decision": "AVOID", "health_adjusted_value_m": 0.0}
+        efficiency = round(fair_value / requested_salary_m, 3) if requested_salary_m > 0 else None
+        overpay = (
+            round((requested_salary_m - fair_value) / requested_salary_m * 100, 1)
+            if requested_salary_m > 0 else None
+        )
+        return {
+            **base,
+            "fair_value_m":            fair_value,
+            "efficiency_ratio":        efficiency,
+            "overpay_pct":             overpay,
+            "decision":                "AVOID",
+            "health_adjusted_value_m": health_adjusted_value,
+        }
 
     if requested_salary_m <= 0:
-        return {**base, "fair_value_m": fair_value, "efficiency_ratio": None,
-                "overpay_pct": None, "decision": "NEGOTIATE",
-                "health_adjusted_value_m": health_adjusted_value}
+        return {
+            **base,
+            "fair_value_m":            fair_value,
+            "efficiency_ratio":        None,
+            "overpay_pct":             None,
+            "decision":                "NEGOTIATE",
+            "health_adjusted_value_m": health_adjusted_value,
+        }
 
     efficiency_ratio = round(fair_value / requested_salary_m, 3)
     overpay_raw = (requested_salary_m - fair_value) / fair_value * 100
