@@ -177,7 +177,7 @@ body {
 /* Mono label */
 .gs-label {
   font-family:    var(--font-mono);
-  font-size:      11px;
+  font-size:      12px;
   letter-spacing: 0.3px;
   color:          var(--text-3);
 }
@@ -185,7 +185,7 @@ body {
 /* Tag / pill */
 .gs-tag {
   font-family:    var(--font-mono);
-  font-size:      11px;
+  font-size:      12px;
   color:          var(--text-2);
   padding:        2px 8px;
   border:         1px solid var(--border);
