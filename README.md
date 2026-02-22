@@ -59,7 +59,7 @@ The durability model discounts for injury risk using `GP/82 × age curve` — a 
 - Python 3.10+
 - Node.js 18+
 - Gemini API key ([get one free](https://aistudio.google.com))
-- ElevenLabs API key ([get one free](https://elevenlabs.io)) — optional, falls back to browser TTS
+- ElevenLabs API key ([get one free](https://elevenlabs.io))
 
 ### Backend
 
