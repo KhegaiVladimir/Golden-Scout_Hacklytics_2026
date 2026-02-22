@@ -3,7 +3,7 @@
 
 > **Should you sign this player?** Golden Scout runs the numbers and tells you: **SIGN**, **NEGOTIATE**, or **AVOID** — with every figure explained.
 
-Built in 24 hours at Hacklytics 2026 (Georgia Tech) by Aditya Chauhan & Vladimir Khegai.
+Built in 36 hours at Hacklytics 2026 (Georgia Tech).
 
 ---
 
