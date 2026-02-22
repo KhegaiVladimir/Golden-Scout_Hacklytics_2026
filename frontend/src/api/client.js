@@ -45,6 +45,10 @@ export const generateCompareVerdict = async (p1, p2) => {
 export const generateAudio = async (text, player_name) => {
   try {
     const res = await api.post('/audio', { text, player_name }, { responseType: 'blob' })
+    // Check if response is JSON (fallback) or actual audio
+    if (res.data.type === 'application/json') {
+      return null  // trigger speechSynthesis fallback
+    }
     return URL.createObjectURL(res.data)
   } catch { return null }
 }
