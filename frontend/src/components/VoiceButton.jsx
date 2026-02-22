@@ -16,8 +16,17 @@ function Waveform() {
   )
 }
 
+function speakWithBrowser(text, setStatus) {
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.rate = 0.88; u.pitch = 0.95
+  setStatus('playing')
+  window.speechSynthesis.speak(u)
+  u.onend = () => setStatus('idle')
+}
+
 export default function VoiceButton({ audioSummary, playerName }) {
-  const [status, setStatus] = useState('idle') // idle | loading | playing
+  const [status, setStatus] = useState('idle')
 
   async function handleClick() {
     if (status === 'playing') {
@@ -26,20 +35,28 @@ export default function VoiceButton({ audioSummary, playerName }) {
       return
     }
     setStatus('loading')
-    const blobUrl = await generateAudio(audioSummary, playerName)
 
-    if (blobUrl) {
-      const audio = new Audio(blobUrl)
-      setStatus('playing')
-      audio.play()
-      audio.onended = () => setStatus('idle')
-    } else {
-      window.speechSynthesis.cancel()
-      const u = new SpeechSynthesisUtterance(audioSummary)
-      u.rate = 0.88; u.pitch = 0.95
-      setStatus('playing')
-      window.speechSynthesis.speak(u)
-      u.onend = () => setStatus('idle')
+    try {
+      const blobUrl = await generateAudio(audioSummary, playerName)
+
+      if (blobUrl) {
+        try {
+          const audio = new Audio(blobUrl)
+          await audio.play()
+          setStatus('playing')
+          audio.onended = () => setStatus('idle')
+          audio.onerror = () => {
+            setStatus('idle')
+            speakWithBrowser(audioSummary, setStatus)
+          }
+        } catch {
+          speakWithBrowser(audioSummary, setStatus)
+        }
+      } else {
+        speakWithBrowser(audioSummary, setStatus)
+      }
+    } catch {
+      speakWithBrowser(audioSummary, setStatus)
     }
   }
 
@@ -48,8 +65,6 @@ export default function VoiceButton({ audioSummary, playerName }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-
-      {/* Label */}
       <p style={{
         fontFamily: 'var(--font-mono)', fontSize: '10px',
         color: 'var(--text-3)', letterSpacing: '0.5px',
@@ -57,7 +72,6 @@ export default function VoiceButton({ audioSummary, playerName }) {
         {isPlaying ? 'Now playing' : 'Hear the verdict'}
       </p>
 
-      {/* Button */}
       <button
         onClick={handleClick}
         disabled={isLoading}
@@ -110,13 +124,11 @@ export default function VoiceButton({ audioSummary, playerName }) {
         )}
       </button>
 
-      {/* ElevenLabs attribution — only while playing */}
       {isPlaying && (
         <p style={{
           fontFamily: 'var(--font-mono)', fontSize: '10px',
           color: 'var(--text-3)', letterSpacing: '0.3px',
-        }}
-          className="fade-up">
+        }} className="fade-up">
           Powered by ElevenLabs
         </p>
       )}
