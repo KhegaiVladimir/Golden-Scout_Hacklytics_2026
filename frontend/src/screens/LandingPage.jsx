@@ -1,4 +1,16 @@
 // frontend/src/screens/LandingPage.jsx
+import { Suspense, lazy, Component } from 'react'
+
+// Lazy load Spline so it never blocks the initial render
+const Spline = lazy(() => import('@splinetool/react-spline'))
+
+// Error boundary — if Spline throws, hero still renders (just no 3D bg)
+class SplineErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { crashed: false } }
+  static getDerivedStateFromError() { return { crashed: true } }
+  render() { return this.state.crashed ? null : this.props.children }
+}
+
 export default function LandingPage({ onLaunch, onNavigate }) {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-0)' }}>
@@ -8,83 +20,78 @@ export default function LandingPage({ onLaunch, onNavigate }) {
         minHeight: '100vh',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        padding: '80px 24px 80px',   // less top pad → text moves up
+        padding: '80px 24px 80px',
         textAlign: 'center',
         position: 'relative',
         overflow: 'hidden',
       }}>
 
-        {/* ── Animated diagonal beam background ── */}
+        {/* ── Spline 3D background ── */}
         <div style={{
           position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse 70% 55% at 50% 55%, rgba(0,0,0,0.5) 0%, var(--bg-0) 100%)',
           pointerEvents: 'none', zIndex: 0,
           overflow: 'hidden',
         }}>
-          {/* Each beam: a thin rotated rectangle that slides across */}
-          {[
-            { width: 180, left: '10%',  delay: '0s',    duration: '8s',  opacity: 0.07 },
-            { width: 80,  left: '22%',  delay: '1.2s',  duration: '10s', opacity: 0.04 },
-            { width: 300, left: '35%',  delay: '0.4s',  duration: '9s',  opacity: 0.06 },
-            { width: 60,  left: '50%',  delay: '2s',    duration: '11s', opacity: 0.035},
-            { width: 220, left: '62%',  delay: '0.8s',  duration: '7s',  opacity: 0.07 },
-            { width: 100, left: '75%',  delay: '1.6s',  duration: '12s', opacity: 0.04 },
-            { width: 260, left: '85%',  delay: '0.2s',  duration: '9s',  opacity: 0.055},
-          ].map((beam, i) => (
-            <div key={i} style={{
-              position: 'absolute',
-              top: '-120%',
-              left: beam.left,
-              width: `${beam.width}px`,
-              height: '250%',
-              background: `linear-gradient(
-                to bottom,
-                transparent 0%,
-                rgba(255,255,255,${beam.opacity}) 30%,
-                rgba(255,255,255,${beam.opacity * 1.4}) 50%,
-                rgba(255,255,255,${beam.opacity}) 70%,
-                transparent 100%
-              )`,
-              transform: 'rotate(-35deg)',
-              transformOrigin: 'top center',
-              animation: `beamSlide ${beam.duration} ${beam.delay} ease-in-out infinite`,
-              filter: 'blur(2px)',
-            }} />
-          ))}
+          {/* Spline scene — lazy + error-bounded so crashes are silent */}
+          <SplineErrorBoundary>
+            <Suspense fallback={null}>
+              <Spline
+                scene="https://prod.spline.design/afD-VkvbBI1ffZye/scene.splinecode"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                }}
+              />
+            </Suspense>
+          </SplineErrorBoundary>
 
-          {/* Radial vignette to fade beams at edges */}
+          {/* Radial vignette — fades hard edges into page bg */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: `radial-gradient(ellipse 80% 60% at 50% 50%, transparent 0%, var(--bg-0) 100%)`,
-            opacity: 0.6,
+            background: 'radial-gradient(ellipse 85% 65% at 50% 50%, transparent 20%, var(--bg-0) 100%)',
+            pointerEvents: 'none',
           }} />
 
-          {/* Bottom fade */}
+          {/* Bottom fade — blends into next section */}
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
             background: 'linear-gradient(to bottom, transparent, var(--bg-0))',
+            pointerEvents: 'none',
           }} />
 
-          {/* Subtle grid */}
+          {/* Top fade — blends under navbar */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '20%',
+            background: 'linear-gradient(to top, transparent, var(--bg-0))',
+            pointerEvents: 'none',
+          }} />
+
+          {/* Subtle grid overlay on top of Spline */}
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
+              linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)
             `,
             backgroundSize: '72px 72px',
+            pointerEvents: 'none',
           }} />
         </div>
 
-        {/* ── Hero content — sits above beams ── */}
+        {/* ── Hero content — sits above Spline ── */}
         <div style={{ position: 'relative', zIndex: 1, marginTop: '-60px' }}>
           {/* Status pill */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '7px',
             fontFamily: 'var(--font-mono)', fontSize: '12px',
-            color: 'var(--text-2)', padding: '5px 14px 5px 10px',
-            border: '1px solid var(--border)', borderRadius: '999px',
-            background: 'rgba(17,17,17,0.7)',
-            backdropFilter: 'blur(8px)',
+            color: 'rgba(255,255,255,0.9)', padding: '5px 14px 5px 10px',
+            border: '1px solid rgba(255,255,255,0.2)', borderRadius: '999px',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             marginBottom: '40px',
             letterSpacing: '0.3px',
           }}>
@@ -99,7 +106,7 @@ export default function LandingPage({ onLaunch, onNavigate }) {
             fontWeight: 600, letterSpacing: '-4px',
             lineHeight: 1, color: 'var(--text-0)',
             marginBottom: '24px',
-            textShadow: '0 0 80px rgba(255,255,255,0.15)',
+            textShadow: '0 2px 40px rgba(0,0,0,0.8), 0 0 80px rgba(0,0,0,0.5)',
           }}>
             Golden Scout
           </h1>
@@ -108,7 +115,7 @@ export default function LandingPage({ onLaunch, onNavigate }) {
           <p style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 'clamp(16px, 2.2vw, 22px)',
-            color: 'var(--text-2)', letterSpacing: '-0.3px',
+            color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.3px',
             marginBottom: '14px',
           }}>
             NBA Contract Decision Engine
@@ -116,7 +123,7 @@ export default function LandingPage({ onLaunch, onNavigate }) {
 
           {/* Subline */}
           <p style={{
-            fontSize: '17px', color: 'var(--text-3)',
+            fontSize: '17px', color: 'rgba(255,255,255,0.65)',
             maxWidth: '420px', lineHeight: 1.65,
             letterSpacing: '-0.1px',
             margin: '0 auto',
@@ -420,29 +427,16 @@ export default function LandingPage({ onLaunch, onNavigate }) {
         }}>
           The methodology
         </h2>
-
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
           gap: '1px', background: 'var(--border)',
           borderRadius: 'var(--r-lg)', overflow: 'hidden',
         }}>
           {[
-            {
-              title: 'Berri & Schmidt (2010)',
-              body: 'One marginal win is worth approximately $3.8M in cap space. Fair value = wins added × $3.8M. This is the foundation every valuation is built on.',
-            },
-            {
-              title: 'Monte Carlo Simulation',
-              body: "10,000 seasons simulated per query. Each run draws from a distribution parameterized by the player's impact score, games played, and minutes. Output: expected wins, 90% CI, playoff probability.",
-            },
-            {
-              title: 'Durability Model',
-              body: 'Health-adjusted value = fair value × durability score. Durability = (GP/82) × age_factor. Age factor applies a max 0.75× discount for players 37+.',
-            },
-            {
-              title: 'Gemini AI Report',
-              body: 'Gemini 2.0 Flash generates a structured executive report — verdict, strengths, concern, and recommendation — grounded entirely in the computed stats, not general knowledge.',
-            },
+            { title: 'Berri & Schmidt (2010)', body: 'One marginal win is worth approximately $3.8M in cap space. Fair value = wins added × $3.8M. This is the foundation every valuation is built on.' },
+            { title: 'Monte Carlo Simulation', body: "10,000 seasons simulated per query. Each run draws from a distribution parameterized by the player's impact score, games played, and minutes. Output: expected wins, 90% CI, playoff probability." },
+            { title: 'Durability Model',        body: 'Health-adjusted value = fair value × durability score. Durability = (GP/82) × age_factor. Age factor applies a max 0.75× discount for players 37+.' },
+            { title: 'Gemini AI Report',        body: 'Gemini 2.0 Flash generates a structured executive report — verdict, strengths, concern, and recommendation — grounded entirely in the computed stats, not general knowledge.' },
           ].map(({ title, body }) => (
             <div key={title} style={{
               background: 'var(--bg-1)', padding: '36px',
@@ -451,15 +445,8 @@ export default function LandingPage({ onLaunch, onNavigate }) {
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-1)'}
             >
-              <p style={{
-                fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 600,
-                color: 'var(--text-0)', letterSpacing: '-0.2px', marginBottom: '12px',
-              }}>
-                {title}
-              </p>
-              <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: 1.8 }}>
-                {body}
-              </p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 600, color: 'var(--text-0)', letterSpacing: '-0.2px', marginBottom: '12px' }}>{title}</p>
+              <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: 1.8 }}>{body}</p>
             </div>
           ))}
         </div>
@@ -469,20 +456,11 @@ export default function LandingPage({ onLaunch, onNavigate }) {
 
       {/* ── TECH STACK ───────────────────────────── */}
       <section style={{ padding: '72px 24px', maxWidth: '1080px', margin: '0 auto' }}>
-        <p style={{
-          fontFamily: 'var(--font-mono)', fontSize: '11px',
-          color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '28px',
-        }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '28px' }}>
           Tech Stack
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-          {[
-            'React', 'FastAPI', 'Python',
-            'Gemini 2.0 Flash', 'ElevenLabs',
-            'Monte Carlo Simulation', 'Recharts',
-            'Berri & Schmidt (2010)', 'Tailwind CSS',
-            '562 NBA Players · 2024-25',
-          ].map(tech => (
+          {['React', 'FastAPI', 'Python', 'Gemini 2.0 Flash', 'ElevenLabs', 'Monte Carlo Simulation', 'Recharts', 'Berri & Schmidt (2010)', 'Tailwind CSS', '562 NBA Players · 2024-25'].map(tech => (
             <span key={tech} style={{
               fontFamily: 'var(--font-mono)', fontSize: '13px',
               color: 'var(--text-2)', padding: '6px 14px',
@@ -492,9 +470,7 @@ export default function LandingPage({ onLaunch, onNavigate }) {
             }}
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-0)'; e.currentTarget.style.borderColor = 'var(--border-hover)' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-2)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-            >
-              {tech}
-            </span>
+            >{tech}</span>
           ))}
         </div>
       </section>
@@ -502,21 +478,11 @@ export default function LandingPage({ onLaunch, onNavigate }) {
       <div style={{ height: '1px', background: 'var(--border)' }} />
 
       {/* ── BOTTOM CTA ───────────────────────────── */}
-      <section style={{
-        padding: '96px 24px', textAlign: 'center',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: '24px',
-      }}>
-        <h2 style={{
-          fontSize: '32px', fontWeight: 600,
-          letterSpacing: '-0.8px', color: 'var(--text-0)',
-        }}>
+      <section style={{ padding: '96px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+        <h2 style={{ fontSize: '32px', fontWeight: 600, letterSpacing: '-0.8px', color: 'var(--text-0)' }}>
           Ready to evaluate a player?
         </h2>
-        <p style={{
-          fontFamily: 'var(--font-mono)', fontSize: '14px',
-          color: 'var(--text-3)',
-        }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--text-3)' }}>
           562 players · 10,000 simulated seasons · Gemini AI reports
         </p>
         <button onClick={onLaunch} style={{
@@ -538,30 +504,18 @@ export default function LandingPage({ onLaunch, onNavigate }) {
 
       {/* ── FOOTER ───────────────────────────────── */}
       <footer style={{
-        borderTop: '1px solid var(--border)',
-        padding: '28px 24px',
+        borderTop: '1px solid var(--border)', padding: '28px 24px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        maxWidth: '1080px', margin: '0 auto',
-        flexWrap: 'wrap', gap: '12px',
+        maxWidth: '1080px', margin: '0 auto', flexWrap: 'wrap', gap: '12px',
       }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
-          Golden Scout · Hacklytics 2026 · Georgia Tech
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
-          React · FastAPI · Gemini · ElevenLabs
-        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>Golden Scout · Hacklytics 2026 · Georgia Tech</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>React · FastAPI · Gemini · ElevenLabs</span>
       </footer>
 
       <style>{`
         @keyframes bounceDown {
           0%, 100% { transform: translateY(0); }
           50%       { transform: translateY(6px); }
-        }
-        @keyframes beamSlide {
-          0%   { transform: rotate(-35deg) translateY(-10%);  opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: 1; }
-          100% { transform: rotate(-35deg) translateY(60%);   opacity: 0; }
         }
       `}</style>
     </div>
