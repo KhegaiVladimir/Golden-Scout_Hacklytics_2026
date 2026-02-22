@@ -83,4 +83,5 @@ def generate_audio(text: str, player_name: str) -> Optional[bytes]:
             return audio_bytes
             
     except Exception as e:
-        return None  # Frontend will use speechSynthesis fallback
+    print(f"ElevenLabs error: {type(e).__name__}: {e}")
+    return None
