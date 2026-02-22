@@ -191,10 +191,7 @@ Full docs available at `/docs` when the server is running.
 
 Georgia Tech · February 2026 · Sports Analytics Track
 
-**Aditya Chauhan**
-**Vladimir Khegai**
-**Nudrat Towsif**
-**Kareem Elabiad**
+**Aditya Chauhan** · **Vladimir Khegai** · **Nudrat Towsif** · **Kareem Elabiad**
 
 ---
 
