@@ -68,6 +68,10 @@ class TradeRequest(BaseModel):
     player_in: str
     current_team_wins: int = 38
 
+class CompareVerdictRequest(BaseModel):
+    p1: Dict
+    p2: Dict
+
 
 @app.on_event("startup")
 async def startup():
@@ -133,7 +137,15 @@ async def report(request: ReportRequest):
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-
+@app.post("/compare-verdict")
+async def compare_verdict(request: CompareVerdictRequest):
+    try:
+        from ai.gemini import generate_compare_verdict
+        result = generate_compare_verdict(request.p1, request.p2)
+        return {"verdict": result}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    
 @app.post("/audio")
 async def audio(req: AudioRequest):
     try:
@@ -237,3 +249,5 @@ async def trade(request: TradeRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+
+

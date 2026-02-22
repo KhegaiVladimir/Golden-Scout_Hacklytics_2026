@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-MODEL = 'gemini-2.5-flash'
+MODEL = 'gemini-2.0-flash'
 
 report_cache = {}
 
@@ -130,6 +130,68 @@ AUDIO_SUMMARY: two sentences for text-to-speech"""
             return generate_report_fallback(computed_results)
 
     return generate_report_fallback(computed_results)
+
+
+def generate_compare_verdict(p1: dict, p2: dict) -> str:
+    """
+    Generate a one-sentence AI verdict comparing two players.
+    Returns a plain string — not a full report.
+    """
+    cache_key = "compare:" + json.dumps({"p1": p1, "p2": p2}, sort_keys=True, default=str)
+    fpath = _cache_file(cache_key)
+
+    if cache_key in report_cache:
+        return report_cache[cache_key]
+
+    if os.path.exists(fpath):
+        with open(fpath, "r") as f:
+            result = json.load(f)
+        report_cache[cache_key] = result.get("verdict", "")
+        return result.get("verdict", "")
+
+    prompt = f"""You are an NBA front office analyst. Compare these two players for a contract decision.
+
+Player 1: {p1['name']}
+- Wins added: {p1['wins_added']:.1f} | Fair value: ${p1['fair_value_m']:.1f}M | Salary ask: ${p1['salary_m']:.1f}M
+- Efficiency: {p1['efficiency_ratio']:.2f}x | Health-adj value: ${p1['health_adj_m']:.1f}M | Decision: {p1['decision']}
+
+Player 2: {p2['name']}
+- Wins added: {p2['wins_added']:.1f} | Fair value: ${p2['fair_value_m']:.1f}M | Salary ask: ${p2['salary_m']:.1f}M
+- Efficiency: {p2['efficiency_ratio']:.2f}x | Health-adj value: ${p2['health_adj_m']:.1f}M | Decision: {p2['decision']}
+
+Write ONE sentence that clearly states which player is the better value and why, using the specific numbers above.
+Be direct. Start with the winner's name. No fluff. Max 30 words."""
+
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(model=MODEL, contents=prompt)
+            verdict = response.text.strip().split('\n')[0].strip()
+
+            report_cache[cache_key] = verdict
+            with open(fpath, "w") as f:
+                json.dump({"verdict": verdict}, f)
+
+            return verdict
+
+        except Exception as e:
+            if '429' in str(e) and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            # Fallback — generate without AI
+            winner = p1 if p1['health_adj_m'] >= p2['health_adj_m'] else p2
+            loser  = p2 if winner == p1 else p1
+            return (
+                f"{winner['name']} is the clear choice — "
+                f"{winner['efficiency_ratio']:.2f}x efficiency and ${winner['health_adj_m']:.1f}M "
+                f"health-adjusted value vs {loser['name']}'s {loser['efficiency_ratio']:.2f}x."
+            )
+
+    winner = p1 if p1['health_adj_m'] >= p2['health_adj_m'] else p2
+    loser  = p2 if winner == p1 else p1
+    return (
+        f"{winner['name']} is the clear choice — "
+        f"{winner['efficiency_ratio']:.2f}x efficiency vs {loser['name']}'s {loser['efficiency_ratio']:.2f}x."
+    )
 
 
 def generate_report_fallback(computed_results: dict) -> dict:
