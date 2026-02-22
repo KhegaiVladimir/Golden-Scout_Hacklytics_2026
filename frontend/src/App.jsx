@@ -6,15 +6,18 @@ import SimulationScreen from './screens/SimulationScreen'
 import DecisionScreen   from './screens/DecisionScreen'
 import ReportScreen     from './screens/ReportScreen'
 import TradeScreen      from './screens/TradeScreen'
+import CompareScreen    from './screens/CompareScreen'
 
 const STEPS = ['Profile', 'Simulation', 'Decision', 'Report']
 const STEP_SCREENS = ['profile', 'simulation', 'decision', 'report']
 
 function NavBar({ screen, onNavigate }) {
   const currentIdx = STEP_SCREENS.indexOf(screen)
-  const isTradeScreen = screen === 'trade'
+  const isTradeScreen   = screen === 'trade'
+  const isCompareScreen = screen === 'compare'
+  const isSideScreen    = isTradeScreen || isCompareScreen
 
-  if (currentIdx === -1 && !isTradeScreen) return null
+  if (currentIdx === -1 && !isSideScreen) return null
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-scout-border/60 bg-scout-bg/80 backdrop-blur-xl">
@@ -26,9 +29,9 @@ function NavBar({ screen, onNavigate }) {
           GOLDEN SCOUT
         </button>
 
-        {isTradeScreen ? (
+        {isSideScreen ? (
           <div className="font-mono text-xs text-scout-teal uppercase tracking-widest border border-scout-teal/30 px-3 py-1 rounded-full">
-            Trade Simulator
+            {isTradeScreen ? 'Trade Simulator' : 'Player Comparison'}
           </div>
         ) : (
           <nav className="flex items-center">
@@ -62,6 +65,16 @@ function NavBar({ screen, onNavigate }) {
 
         <div className="flex items-center gap-4">
           <button
+            onClick={() => onNavigate('compare')}
+            className={`font-mono text-xs uppercase tracking-widest transition-colors px-3 py-1 rounded-lg
+              ${isCompareScreen
+                ? 'text-scout-teal border border-scout-teal/30'
+                : 'text-scout-muted hover:text-scout-teal'
+              }`}
+          >
+            Compare
+          </button>
+          <button
             onClick={() => onNavigate('trade')}
             className={`font-mono text-xs uppercase tracking-widest transition-colors px-3 py-1 rounded-lg
               ${isTradeScreen
@@ -72,7 +85,8 @@ function NavBar({ screen, onNavigate }) {
             Trade Sim
           </button>
           <div className="font-mono text-xs text-scout-muted w-28 text-right truncate">
-            {screen !== 'search' && screen !== 'trade' ? sessionStorage.getItem('playerName') : ''}
+            {screen !== 'search' && screen !== 'trade' && screen !== 'compare'
+              ? sessionStorage.getItem('playerName') : ''}
           </div>
         </div>
       </div>
@@ -100,7 +114,6 @@ export default function App() {
     sessionStorage.setItem('playerName', playerName)
 
     try {
-      // 1. Profile
       const profile = await fetchProfile(playerName)
       if (!profile) {
         setError('Player not found. Check spelling and try again.')
@@ -111,7 +124,6 @@ export default function App() {
       const mpg = profile.stats?.mp ?? 30
       const age = (profile.age && profile.age !== 'N/A') ? parseFloat(profile.age) : 0
 
-      // 2. Simulation
       const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, mpg)
       if (!sim) {
         setError('Simulation failed. Please try again.')
@@ -119,9 +131,7 @@ export default function App() {
         return
       }
 
-      // 3. Valuation
       const val = await calculateValue(sim.wins_added, salaryAsk, age, profile.gp, mpg)
-      // FIX: убраны console.log из продакшена
       if (import.meta.env.DEV) {
         console.log('valuation:', val)
         console.log('stats:', profile.stats)
@@ -132,33 +142,31 @@ export default function App() {
         return
       }
 
-      // 4. Report — non-critical, app works without it
       let rep = null
       try {
         rep = await generateReport({
-  player:             profile.player,
-  position:           profile.position,
-  impact_score:       profile.impact_score,
-  percentile:         profile.percentile,
-  trend_signal:       profile.trend_signal,
-  wins_added:         sim.wins_added,
-  expected_wins:      sim.expected_wins,
-  playoff_prob:       sim.playoff_prob,
-  fair_value_m:       val.fair_value_m,
-  efficiency_ratio:   val.efficiency_ratio,
-  overpay_pct:        val.overpay_pct,
-  decision:           val.decision,
-  absence_reason:     val.absence_reason   ?? 'full',
-  is_projected:       val.is_projected     ?? false,
-  projected_wins:     val.projected_wins,
-  requested_salary_m: salaryAsk,
-  current_team_wins:  teamWins,
-  gp:                 profile.gp,          // ← добавь
-  age:                profile.age,          // ← добавь
-  durability_score:   val.durability_score, // ← добавь
-})
+          player:             profile.player,
+          position:           profile.position,
+          impact_score:       profile.impact_score,
+          percentile:         profile.percentile,
+          trend_signal:       profile.trend_signal,
+          wins_added:         sim.wins_added,
+          expected_wins:      sim.expected_wins,
+          playoff_prob:       sim.playoff_prob,
+          fair_value_m:       val.fair_value_m,
+          efficiency_ratio:   val.efficiency_ratio,
+          overpay_pct:        val.overpay_pct,
+          decision:           val.decision,
+          absence_reason:     val.absence_reason   ?? 'full',
+          is_projected:       val.is_projected     ?? false,
+          projected_wins:     val.projected_wins,
+          requested_salary_m: salaryAsk,
+          current_team_wins:  teamWins,
+          gp:                 profile.gp,
+          age:                profile.age,
+          durability_score:   val.durability_score,
+        })
       } catch {
-        // Report failing shouldn't block the user — they can still see the decision
         console.warn('Report generation failed, continuing without it.')
       }
 
@@ -186,6 +194,7 @@ export default function App() {
         {screen === 'decision'   && <DecisionScreen   data={playerData} onNext={() => nav('report')}     onBack={() => nav('simulation')} />}
         {screen === 'report'     && <ReportScreen     data={playerData} onBack={() => nav('decision')} />}
         {screen === 'trade'      && <TradeScreen      onBack={() => nav('search')} players={players} />}
+        {screen === 'compare'    && <CompareScreen    onBack={() => nav('search')} players={players} />}
       </div>
     </div>
   )
