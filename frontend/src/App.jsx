@@ -14,7 +14,6 @@ const STEPS        = ['Profile', 'Simulation', 'Decision', 'Report']
 const STEP_SCREENS = ['profile', 'simulation', 'decision', 'report']
 const APP_SCREENS  = ['search', 'profile', 'simulation', 'decision', 'report']
 
-/* ─── NAV BAR — Raycast floating pill style ───────────────── */
 function NavBar({ screen, onNavigate }) {
   const isLanding  = screen === 'landing'
   const isApp      = APP_SCREENS.includes(screen)
@@ -43,7 +42,6 @@ function NavBar({ screen, onNavigate }) {
           pointerEvents: 'all',
           boxShadow: '0 2px 24px rgba(0,0,0,0.5)',
         }}>
-          {/* Logo */}
           <button onClick={() => onNavigate('landing')} style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             background: 'none', border: 'none', cursor: 'pointer',
@@ -60,7 +58,6 @@ function NavBar({ screen, onNavigate }) {
             Golden Scout
           </button>
 
-          {/* Center nav links — navigate directly to screens */}
           <nav style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
             {[
               { label: 'App',       target: 'search'  },
@@ -84,7 +81,6 @@ function NavBar({ screen, onNavigate }) {
             ))}
           </nav>
 
-          {/* Launch App */}
           <button onClick={() => onNavigate('search')} style={{
             padding: '7px 18px',
             background: 'var(--text-0)', color: 'var(--bg-0)',
@@ -103,11 +99,8 @@ function NavBar({ screen, onNavigate }) {
     )
   }
 
-  // ── App / Trade / Compare screens — edge-to-edge bar ──
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-    }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
       <div style={{
         borderBottom: '1px solid var(--border)',
         background: 'rgba(9,9,9,0.90)',
@@ -119,7 +112,6 @@ function NavBar({ screen, onNavigate }) {
           padding: '0 24px', height: '56px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          {/* Logo */}
           <button onClick={() => onNavigate('landing')} style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             background: 'none', border: 'none', cursor: 'pointer',
@@ -136,7 +128,6 @@ function NavBar({ screen, onNavigate }) {
             Golden Scout
           </button>
 
-          {/* Center — step breadcrumb on inner screens */}
           {currentIdx !== -1 && (
             <nav style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               {STEPS.map((step, i) => {
@@ -181,7 +172,6 @@ function NavBar({ screen, onNavigate }) {
             </nav>
           )}
 
-          {/* Side screen label */}
           {(isTrade || isCompare) && (
             <span style={{
               fontFamily: 'var(--font-mono)', fontSize: '11px',
@@ -193,7 +183,6 @@ function NavBar({ screen, onNavigate }) {
             </span>
           )}
 
-          {/* Right — Compare + Trade buttons + player name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {['Compare', 'Trade'].map(label => {
               const key    = label === 'Trade' ? 'trade' : 'compare'
@@ -229,7 +218,6 @@ function NavBar({ screen, onNavigate }) {
         </div>
       </div>
 
-      {/* Sub-tabs — only on app screens */}
       {isApp && (
         <div style={{
           borderBottom: '1px solid var(--border)',
@@ -283,7 +271,6 @@ function NavBar({ screen, onNavigate }) {
   )
 }
 
-/* ─── ROOT APP ─────────────────────────────────────────────── */
 export default function App() {
   const [screen, setScreen] = useState('landing')
   const [players, setPlayers] = useState([])
@@ -303,15 +290,24 @@ export default function App() {
     try {
       const profile = await fetchProfile(playerName)
       if (!profile) { setError('Player not found. Check spelling and try again.'); setLoading(false); return }
+
       const mpg = profile.stats?.mp ?? 30
       const age = (profile.age && profile.age !== 'N/A') ? parseFloat(profile.age) : 0
+
       const sim = await runSimulation(profile.impact_score, teamWins, profile.gp, mpg)
       if (!sim) { setError('Simulation failed. Please try again.'); setLoading(false); return }
+
       const val = await calculateValue(sim.wins_added, salaryAsk, age, profile.gp, mpg)
       if (!val) { setError('Valuation failed. Please try again.'); setLoading(false); return }
-      let rep = null
+
+      // Show profile immediately — don't wait for Gemini
+      setPlayerData({ profile, simulation: sim, valuation: val, report: null, teamWins, salaryAsk })
+      setScreen('profile')
+      setLoading(false)
+
+      // Generate report in background — updates when ready
       try {
-        rep = await generateReport({
+        const rep = await generateReport({
           player: profile.player, position: profile.position,
           impact_score: profile.impact_score, percentile: profile.percentile,
           trend_signal: profile.trend_signal, wins_added: sim.wins_added,
@@ -324,21 +320,20 @@ export default function App() {
           requested_salary_m: salaryAsk, current_team_wins: teamWins,
           gp: profile.gp, age: profile.age, durability_score: val.durability_score,
         })
+        setPlayerData(prev => ({ ...prev, report: rep }))
       } catch { console.warn('Report generation failed, continuing without it.') }
-      setPlayerData({ profile, simulation: sim, valuation: val, report: rep, teamWins, salaryAsk })
-      setScreen('profile')
+
     } catch (err) {
       setError('Something went wrong. Please check your connection and try again.')
       console.error(err)
-    } finally { setLoading(false) }
+      setLoading(false)
+    }
   }
 
   const nav       = s => setScreen(s)
   const isLanding = screen === 'landing'
   const isApp     = APP_SCREENS.includes(screen)
-  // Landing: pill nav floats at top with padding, no extra body padding needed
-  // App: two bars (56 + 36 = 92px). Trade/Compare: one bar (56px)
-  const topPad = isLanding ? '84px' : isApp ? '92px' : '56px'
+  const topPad    = isLanding ? '84px' : isApp ? '92px' : '56px'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-0)' }}>

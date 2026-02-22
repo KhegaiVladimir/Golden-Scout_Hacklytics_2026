@@ -199,10 +199,14 @@ export default function CompareScreen({ onBack, players }) {
         { name: p1.player, wins_added: sim1.wins_added, fair_value_m: val1.fair_value_m, salary_m: salary1, efficiency_ratio: val1.efficiency_ratio ?? 0, health_adj_m: val1.health_adjusted_value_m, decision: val1.decision },
         { name: p2.player, wins_added: sim2.wins_added, fair_value_m: val2.fair_value_m, salary_m: salary2, efficiency_ratio: val2.efficiency_ratio ?? 0, health_adj_m: val2.health_adjusted_value_m, decision: val2.decision }
       ).then(v => {
+        console.log('raw verdict response:', JSON.stringify(v))  // ← сюда
         if (v?.verdict) setAiVerdict(v.verdict)
         else if (typeof v === 'string') setAiVerdict(v)
         setAiLoading(false)
-      }).catch(() => setAiLoading(false))
+      }).catch((err) => {
+        console.log('verdict error:', err)
+        setAiLoading(false)
+      })
 
     } catch {
       setError('Something went wrong. Please try again.')
