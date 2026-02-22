@@ -1,16 +1,28 @@
-export default function Skeleton({ className = '' }) {
+// Skeleton.jsx
+export default function Skeleton({ style = {} }) {
   return (
-    <div className={`bg-scout-border rounded relative overflow-hidden ${className}`}>
-      <div className="absolute inset-0 shimmer" />
-    </div>
+    <div
+      className="skeleton"
+      style={{
+        borderRadius: 'var(--r-sm)',
+        background: 'var(--bg-2)',
+        ...style,
+      }}
+    />
   )
 }
 
-export function SkeletonBlock({ rows = 4, className = '' }) {
+export function SkeletonBlock({ rows = 4 }) {
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {[...Array(rows)].map((_, i) => (
-        <Skeleton key={i} className={`h-5 ${i % 3 === 2 ? 'w-2/3' : 'w-full'}`} />
+        <Skeleton
+          key={i}
+          style={{
+            height: '16px',
+            width: i % 3 === 2 ? '60%' : '100%',
+          }}
+        />
       ))}
     </div>
   )

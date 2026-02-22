@@ -1,31 +1,42 @@
-// z > 0 = green (good), z < 0 = red (bad)
-// For turnovers pass -z so high TO = negative = red
+// StatTable.jsx
 function zColor(z) {
-  if (z == null) return 'text-scout-muted'
-  return z > 0 ? 'text-green-400' : 'text-red-400'
+  if (z == null) return 'var(--text-3)'
+  return z > 0 ? 'var(--green)' : 'var(--red)'
 }
 
 function zToPercentile(z) {
   if (z == null) return null
-  const p = Math.round(50 + z * 15)
-  return Math.min(99, Math.max(1, p))
+  return Math.min(99, Math.max(1, Math.round(50 + z * 15)))
 }
 
 function PctBadge({ pct }) {
-  if (pct == null) return <span className="text-scout-muted">—</span>
-  const color = pct >= 80 ? 'text-green-400' : pct >= 50 ? 'text-scout-amber' : 'text-red-400'
-  return <span className={`font-mono text-xs font-bold ${color}`}>{pct}th</span>
+  if (pct == null) return <span style={{ color: 'var(--text-3)' }}>—</span>
+  const color = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)'
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: '10px',
+      fontWeight: 600, color,
+    }}>
+      {pct}th
+    </span>
+  )
 }
 
 function CVBadge({ cv }) {
   if (cv == null) return null
-  const { label, cls } =
-    cv < 25  ? { label: 'Reliable', cls: 'text-green-400 bg-green-900/30 border-green-700/50' } :
-    cv <= 40 ? { label: 'Moderate', cls: 'text-scout-amber bg-amber-900/30 border-amber-700/50' } :
-               { label: 'Volatile', cls: 'text-red-400 bg-red-900/30 border-red-700/50' }
+  const cfg = cv < 25  ? { label: 'Reliable', color: 'var(--green)', subtle: 'var(--green-subtle)', border: 'var(--green-border)' }
+            : cv <= 40 ? { label: 'Moderate', color: 'var(--amber)', subtle: 'var(--amber-subtle)', border: 'var(--amber-border)' }
+            :            { label: 'Volatile',  color: 'var(--red)',   subtle: 'var(--red-subtle)',   border: 'var(--red-border)'   }
   return (
-    <span className={`ml-1.5 px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border ${cls}`}>
-      {label}
+    <span style={{
+      marginLeft: '6px',
+      fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+      color: cfg.color, background: cfg.subtle,
+      border: `1px solid ${cfg.border}`,
+      padding: '1px 5px', borderRadius: '3px',
+      letterSpacing: '0.3px',
+    }}>
+      {cfg.label}
     </span>
   )
 }
@@ -34,59 +45,81 @@ export default function StatTable({ profile }) {
   if (!profile) return null
   const {
     stats, z_scores, ts_pct, pos_avg_ts,
-    pos_avg_pts, pos_avg_ast, pos_avg_reb, pos_avg_stl_blk, pos_avg_tov,
-    cv, impact_score
+    pos_avg_pts, pos_avg_ast, pos_avg_reb,
+    pos_avg_stl_blk, pos_avg_tov, cv, impact_score,
   } = profile
 
-  const fmt = (v) => v != null ? v : '—'
+  const fmt = v => v != null ? v : '—'
 
-  // colorZ is used for color + percentile; z is the raw displayed value.
-  // For turnovers: high TO = high raw z = BAD → negate so color logic is uniform.
   const rows = [
-    { metric: 'True Shooting %',  value: `${ts_pct}%`,                  posAvg: `${pos_avg_ts}%`,      z: z_scores.ts_pct,    colorZ: z_scores.ts_pct },
-    { metric: 'Impact Score',     value: impact_score.toFixed(2),        posAvg: '0.00',                z: impact_score,       colorZ: impact_score },
-    { metric: 'Consistency (CV)', value: cv,                             posAvg: '—',                   z: null,               colorZ: null,               cvBadge: true },
-    { metric: 'Points',           value: stats.pts,                      posAvg: fmt(pos_avg_pts),      z: z_scores.pts,       colorZ: z_scores.pts },
-    { metric: 'Assists',          value: stats.ast,                      posAvg: fmt(pos_avg_ast),      z: z_scores.ast,       colorZ: z_scores.ast },
-    { metric: 'Rebounds',         value: stats.reb,                      posAvg: fmt(pos_avg_reb),      z: z_scores.reb,       colorZ: z_scores.reb },
-    { metric: 'Stl + Blk',        value: `${stats.stl} + ${stats.blk}`, posAvg: fmt(pos_avg_stl_blk), z: z_scores.defense,   colorZ: z_scores.defense },
-    // Turnovers: high z = many TOs = BAD → negate colorZ so red appears when z > 0
-    { metric: 'Turnovers',        value: stats.tov,                      posAvg: fmt(pos_avg_tov),      z: z_scores.tov,       colorZ: -(z_scores.tov ?? 0) },
+    { metric: 'True Shooting %',  value: `${ts_pct}%`,                  posAvg: `${pos_avg_ts}%`,      z: z_scores.ts_pct,  colorZ: z_scores.ts_pct },
+    { metric: 'Impact Score',     value: impact_score.toFixed(2),        posAvg: '0.00',                z: impact_score,     colorZ: impact_score },
+    { metric: 'Consistency (CV)', value: cv,                             posAvg: '—',                   z: null,             colorZ: null, cvBadge: true },
+    { metric: 'Points',           value: stats.pts,                      posAvg: fmt(pos_avg_pts),      z: z_scores.pts,     colorZ: z_scores.pts },
+    { metric: 'Assists',          value: stats.ast,                      posAvg: fmt(pos_avg_ast),      z: z_scores.ast,     colorZ: z_scores.ast },
+    { metric: 'Rebounds',         value: stats.reb,                      posAvg: fmt(pos_avg_reb),      z: z_scores.reb,     colorZ: z_scores.reb },
+    { metric: 'Stl + Blk',        value: `${stats.stl} + ${stats.blk}`, posAvg: fmt(pos_avg_stl_blk), z: z_scores.defense, colorZ: z_scores.defense },
+    { metric: 'Turnovers',        value: stats.tov,                      posAvg: fmt(pos_avg_tov),      z: z_scores.tov,     colorZ: -(z_scores.tov ?? 0) },
   ]
 
+  const cellStyle = {
+    fontFamily: 'var(--font-mono)', fontSize: '12px',
+    padding: '9px 8px', borderBottom: '1px solid var(--border)',
+  }
+
   return (
-    <table className="w-full text-sm">
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
-        <tr className="text-scout-muted font-mono text-xs uppercase tracking-wider border-b border-scout-border">
-          <th className="text-left py-2 pr-3">Metric</th>
-          <th className="text-right py-2 px-2">Value</th>
-          <th className="text-right py-2 px-2">Pos. Avg</th>
-          <th className="text-right py-2 px-2">Z</th>
-          <th className="text-right py-2">Pctile</th>
+        <tr>
+          {['Metric', 'Value', 'Pos. Avg', 'Z', 'Pctile'].map((h, i) => (
+            <th key={h} style={{
+              fontFamily: 'var(--font-mono)', fontSize: '10px',
+              color: 'var(--text-3)', letterSpacing: '0.5px',
+              textAlign: i === 0 ? 'left' : 'right',
+              padding: '0 8px 10px',
+              borderBottom: '1px solid var(--border)',
+              fontWeight: 400,
+            }}>
+              {h}
+            </th>
+          ))}
         </tr>
       </thead>
-      <tbody className="divide-y divide-scout-border/50">
-        {rows.map(row => {
+      <tbody>
+        {rows.map((row, ri) => {
           const pct = zToPercentile(row.colorZ)
+          const isLast = ri === rows.length - 1
           return (
-            <tr key={row.metric} className="hover:bg-white/[0.02] transition-colors">
-              <td className="py-2 pr-3 text-scout-text text-xs">
+            <tr key={row.metric}
+              style={{ transition: 'background 0.1s ease' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {/* Metric */}
+              <td style={{ ...cellStyle, textAlign: 'left', color: 'var(--text-1)', borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
                 {row.metric}
               </td>
-              <td className="py-2 px-2 text-right font-mono text-xs text-scout-text">
+              {/* Value */}
+              <td style={{ ...cellStyle, textAlign: 'right', color: 'var(--text-0)', borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
                 {row.cvBadge
-                  ? <span className="inline-flex items-center justify-end gap-0.5">
-                      <span>{row.value}</span>
-                      <CVBadge cv={cv} />
+                  ? <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {row.value}<CVBadge cv={cv} />
                     </span>
                   : row.value
                 }
               </td>
-              <td className="py-2 px-2 text-right font-mono text-xs text-scout-muted">{row.posAvg}</td>
-              <td className={`py-2 px-2 text-right font-mono text-xs font-bold ${zColor(row.colorZ)}`}>
+              {/* Pos Avg */}
+              <td style={{ ...cellStyle, textAlign: 'right', color: 'var(--text-3)', borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
+                {row.posAvg}
+              </td>
+              {/* Z score */}
+              <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 600, color: zColor(row.colorZ), borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
                 {row.z != null ? (row.z > 0 ? '+' : '') + row.z.toFixed(2) : '—'}
               </td>
-              <td className="py-2 text-right"><PctBadge pct={pct} /></td>
+              {/* Percentile */}
+              <td style={{ ...cellStyle, textAlign: 'right', borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
+                <PctBadge pct={pct} />
+              </td>
             </tr>
           )
         })}

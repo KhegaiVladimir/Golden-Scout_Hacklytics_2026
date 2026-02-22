@@ -1,13 +1,21 @@
+// TrendBadge.jsx
 const CONFIG = {
-  TRENDING_UP:   { icon: '↑', label: 'Hot Streak', cls: 'text-scout-green  bg-scout-green/10  border-scout-green/25'  },
-  TRENDING_DOWN: { icon: '↓', label: 'Cold Spell',  cls: 'text-scout-red   bg-scout-red/10    border-scout-red/25'    },
-  STEADY:        { icon: '→', label: 'Steady',       cls: 'text-scout-dim   bg-scout-card2     border-scout-border'    },
+  TRENDING_UP:   { icon: '↑', label: 'Hot Streak', color: 'var(--green)', subtle: 'var(--green-subtle)', border: 'var(--green-border)' },
+  TRENDING_DOWN: { icon: '↓', label: 'Cold Spell',  color: 'var(--red)',   subtle: 'var(--red-subtle)',   border: 'var(--red-border)'   },
+  STEADY:        { icon: '→', label: 'Steady',       color: 'var(--text-2)', subtle: 'transparent',       border: 'var(--border)'        },
 }
 
 export default function TrendBadge({ trend }) {
   const cfg = CONFIG[trend] || CONFIG.STEADY
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs ${cfg.cls}`}>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '5px',
+      fontFamily: 'var(--font-mono)', fontSize: '11px',
+      color: cfg.color, background: cfg.subtle,
+      border: `1px solid ${cfg.border}`,
+      padding: '2px 8px', borderRadius: 'var(--r-sm)',
+      letterSpacing: '0.2px',
+    }}>
       {cfg.icon} {cfg.label}
     </span>
   )

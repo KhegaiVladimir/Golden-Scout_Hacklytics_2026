@@ -1,3 +1,4 @@
+// CompareScreen.jsx
 import { useState, useEffect, useRef } from 'react'
 import { fetchProfile, runSimulation, calculateValue, generateCompareVerdict } from '../api/client'
 
@@ -15,97 +16,130 @@ function PlayerSearch({ label, value, onChange, players, salary, onSalary }) {
   useEffect(() => {
     if (query.length < 2) { setFiltered([]); setOpen(false); return }
     const f = players.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
-    setFiltered(f)
-    setOpen(f.length > 0)
+    setFiltered(f); setOpen(f.length > 0)
   }, [query, players])
 
   useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    const handler = e => { if (!ref.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const select = (name) => {
-    setQuery(name)
-    onChange(name)
-    setOpen(false)
-  }
+  const select = name => { setQuery(name); onChange(name); setOpen(false) }
 
   return (
-    <div className="bg-scout-card border border-scout-border rounded-2xl p-5 flex-1">
-      <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-3">{label}</p>
+    <div style={{
+      background: 'var(--bg-1)', border: '1px solid var(--border)',
+      borderRadius: 'var(--r-lg)', padding: '20px',
+      display: 'flex', flexDirection: 'column', gap: '12px',
+    }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px' }}>
+        {label}
+      </p>
 
-      <div ref={ref} className="relative mb-3">
-        <input
-          value={query}
-          onChange={e => { setQuery(e.target.value); onChange('') }}
-          placeholder="Search player..."
-          className="w-full bg-scout-card2 border border-scout-border rounded-xl px-4 py-3 font-mono text-sm text-scout-text placeholder-scout-muted focus:outline-none focus:border-scout-teal transition-colors"
-        />
+      <div ref={ref} style={{ position: 'relative' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          background: 'var(--bg-0)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)', padding: '0 4px 0 12px',
+        }}
+          onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--border-active)'}
+          onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input value={query} onChange={e => { setQuery(e.target.value); onChange('') }}
+            placeholder="Search player..."
+            style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-0)', padding: '10px 8px' }}
+          />
+        </div>
         {open && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-scout-card border border-scout-border rounded-xl overflow-hidden shadow-card">
+          <ul style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+            background: 'var(--bg-1)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-md)', overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)', listStyle: 'none',
+          }}>
             {filtered.map(name => (
-              <button key={name} onClick={() => select(name)}
-                className="w-full text-left px-4 py-2.5 font-mono text-sm text-scout-text hover:bg-scout-card2 transition-colors">
+              <li key={name} onClick={() => select(name)} style={{
+                padding: '9px 14px', fontFamily: 'var(--font-sans)', fontSize: '13px',
+                cursor: 'pointer', color: 'var(--text-1)', borderBottom: '1px solid var(--border)',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-0)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-1)' }}
+              >
                 {name}
-              </button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-xs text-scout-muted">Salary ask</span>
-        <span className="font-mono text-xs text-scout-gold">$</span>
-        <input
-          type="number"
-          value={salary}
-          onChange={e => onSalary(Number(e.target.value))}
-          min={1} max={200}
-          className="w-20 bg-scout-card2 border border-scout-border rounded-lg px-2 py-1 font-mono text-sm text-scout-gold focus:outline-none focus:border-scout-teal"
-        />
-        <span className="font-mono text-xs text-scout-muted">M/yr</span>
+      {/* Salary input */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)' }}>Salary ask</span>
+        <div style={{
+          background: 'var(--bg-0)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-sm)', padding: '4px 10px',
+          display: 'flex', alignItems: 'center', gap: '4px',
+        }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-2)' }}>$</span>
+          <input type="number" value={salary} onChange={e => onSalary(Number(e.target.value))} min={1} max={200}
+            style={{ width: '48px', background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: 'var(--text-0)', MozAppearance: 'textfield' }}
+          />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>M</span>
+        </div>
       </div>
     </div>
   )
 }
 
-function StatRow({ label, v1, v2, format = v => v, compare = true, higherIsBetter = true }) {
+function StatRow({ label, v1, v2, format = v => v, higherIsBetter = true }) {
   const n1 = typeof v1 === 'number' ? v1 : null
   const n2 = typeof v2 === 'number' ? v2 : null
-  const p1Better = compare && n1 != null && n2 != null && (higherIsBetter ? n1 > n2 : n1 < n2)
-  const p2Better = compare && n1 != null && n2 != null && (higherIsBetter ? n2 > n1 : n2 < n1)
+  const p1Better = n1 != null && n2 != null && (higherIsBetter ? n1 > n2 : n1 < n2)
+  const p2Better = n1 != null && n2 != null && (higherIsBetter ? n2 > n1 : n2 < n1)
+
+  const cellColor = (better) => better ? 'var(--text-0)' : 'var(--text-2)'
 
   return (
-    <div className="grid grid-cols-3 gap-2 py-2 border-b border-scout-border/30">
-      <div className={`font-mono text-sm text-right ${p1Better ? 'text-scout-teal font-bold' : 'text-scout-text'}`}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textAlign: 'right', fontWeight: p1Better ? 600 : 400, color: cellColor(p1Better) }}>
         {n1 != null ? format(n1) : (v1 != null ? format(v1) : '—')}
       </div>
-      <div className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">{label}</div>
-      <div className={`font-mono text-sm text-left ${p2Better ? 'text-scout-teal font-bold' : 'text-scout-text'}`}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textAlign: 'left', fontWeight: p2Better ? 600 : 400, color: cellColor(p2Better) }}>
         {n2 != null ? format(n2) : (v2 != null ? format(v2) : '—')}
       </div>
     </div>
   )
 }
 
-function DecisionBadge({ decision }) {
+function VerdictBadge({ decision }) {
   const cfg = {
-    SIGN:      { color: 'text-scout-green', border: 'border-scout-green/30', bg: 'bg-scout-green/5', label: '✓ SIGN' },
-    NEGOTIATE: { color: 'text-scout-amber', border: 'border-scout-amber/30', bg: 'bg-scout-amber/5', label: '⟳ NEGOTIATE' },
-    AVOID:     { color: 'text-scout-red',   border: 'border-scout-red/30',   bg: 'bg-scout-red/5',   label: '✕ AVOID' },
-  }[decision] || { color: 'text-scout-muted', border: 'border-scout-border', bg: '', label: decision }
+    SIGN:      { color: 'var(--green)', subtle: 'var(--green-subtle)', border: 'var(--green-border)', label: '✓ SIGN' },
+    NEGOTIATE: { color: 'var(--amber)', subtle: 'var(--amber-subtle)', border: 'var(--amber-border)', label: '⟳ NEGOTIATE' },
+    AVOID:     { color: 'var(--red)',   subtle: 'var(--red-subtle)',   border: 'var(--red-border)',   label: '✕ AVOID' },
+  }[decision] || { color: 'var(--text-3)', subtle: 'transparent', border: 'var(--border)', label: decision }
 
   return (
-    <span className={`font-mono text-xs font-bold ${cfg.color} border ${cfg.border} ${cfg.bg} px-3 py-1 rounded-full`}>
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600,
+      color: cfg.color, background: cfg.subtle,
+      border: `1px solid ${cfg.border}`,
+      padding: '2px 10px', borderRadius: '999px', letterSpacing: '0.3px',
+    }}>
       {cfg.label}
     </span>
   )
 }
 
 function RiskLabel({ value }) {
-  const color = value === 'LOW RISK' ? 'text-scout-green' : value === 'MODERATE RISK' ? 'text-scout-amber' : 'text-scout-red'
-  return <span className={`font-mono text-xs ${color}`}>{value}</span>
+  const color = value === 'LOW RISK' ? 'var(--green)' : value === 'MODERATE RISK' ? 'var(--amber)' : 'var(--red)'
+  return <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color }}>{value}</span>
 }
 
 export default function CompareScreen({ onBack, players }) {
@@ -116,17 +150,14 @@ export default function CompareScreen({ onBack, players }) {
   const [result, setResult]     = useState(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
-  const [aiVerdict, setAiVerdict]   = useState(null)
-  const [aiLoading, setAiLoading]   = useState(false)
+  const [aiVerdict, setAiVerdict]  = useState(null)
+  const [aiLoading, setAiLoading]  = useState(false)
 
   const canRun = name1 && name2 && name1 !== name2
 
   const runCompare = async () => {
     if (!canRun) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setAiVerdict(null)
+    setLoading(true); setError(null); setResult(null); setAiVerdict(null)
 
     try {
       const [p1, p2] = await Promise.all([fetchProfile(name1), fetchProfile(name2)])
@@ -137,7 +168,6 @@ export default function CompareScreen({ onBack, players }) {
         runSimulation(p1.impact_score, 38, p1.gp, p1.stats?.mp ?? 30),
         runSimulation(p2.impact_score, 38, p2.gp, p2.stats?.mp ?? 30),
       ])
-
       const [val1, val2] = await Promise.all([
         calculateValue(sim1.wins_added, salary1, p1.age ?? 0, p1.gp, p1.stats?.mp ?? 30),
         calculateValue(sim2.wins_added, salary2, p2.age ?? 0, p2.gp, p2.stats?.mp ?? 30),
@@ -146,34 +176,17 @@ export default function CompareScreen({ onBack, players }) {
       const newResult = { p1, p2, sim1, sim2, val1, val2 }
       setResult(newResult)
 
-      // Fire AI verdict async — doesn't block the UI
       setAiLoading(true)
       generateCompareVerdict(
-        {
-          name: p1.player,
-          wins_added: sim1.wins_added,
-          fair_value_m: val1.fair_value_m,
-          salary_m: salary1,
-          efficiency_ratio: val1.efficiency_ratio ?? 0,
-          health_adj_m: val1.health_adjusted_value_m,
-          decision: val1.decision,
-        },
-        {
-          name: p2.player,
-          wins_added: sim2.wins_added,
-          fair_value_m: val2.fair_value_m,
-          salary_m: salary2,
-          efficiency_ratio: val2.efficiency_ratio ?? 0,
-          health_adj_m: val2.health_adjusted_value_m,
-          decision: val2.decision,
-        }
+        { name: p1.player, wins_added: sim1.wins_added, fair_value_m: val1.fair_value_m, salary_m: salary1, efficiency_ratio: val1.efficiency_ratio ?? 0, health_adj_m: val1.health_adjusted_value_m, decision: val1.decision },
+        { name: p2.player, wins_added: sim2.wins_added, fair_value_m: val2.fair_value_m, salary_m: salary2, efficiency_ratio: val2.efficiency_ratio ?? 0, health_adj_m: val2.health_adjusted_value_m, decision: val2.decision }
       ).then(v => {
         if (v?.verdict) setAiVerdict(v.verdict)
         else if (typeof v === 'string') setAiVerdict(v)
         setAiLoading(false)
       }).catch(() => setAiLoading(false))
 
-    } catch (e) {
+    } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
@@ -185,110 +198,132 @@ export default function CompareScreen({ onBack, players }) {
     : null
 
   return (
-    <div className="min-h-screen bg-scout-bg pt-20 pb-16">
-      <div className="max-w-5xl mx-auto px-6">
+    <div style={{ minHeight: '100vh', paddingTop: '72px', paddingBottom: '64px' }}>
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 24px' }}>
 
-        {/* Header */}
-        <div className="fade-up mb-10">
-          <button onClick={onBack} className="font-mono text-xs text-scout-muted hover:text-scout-teal transition-colors mb-6 flex items-center gap-2">
+        {/* ── Header ───────────────────────────────── */}
+        <div className="fade-up" style={{ marginBottom: '40px' }}>
+          <button onClick={onBack} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: '12px',
+            color: 'var(--text-3)', marginBottom: '24px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            transition: 'color 0.15s ease', padding: 0,
+          }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+          >
             ← Back
           </button>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="font-mono text-xs bg-scout-teal/10 text-scout-teal border border-scout-teal/20 px-3 py-1 rounded-full uppercase tracking-widest">
-              Player Comparison
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-scout-text">Player Comparison</h1>
-          <p className="text-scout-muted font-mono text-sm mt-2">
-            Compare two players head-to-head at any salary ask
+          <h1 style={{ fontSize: '28px', fontWeight: 600, letterSpacing: '-0.6px', color: 'var(--text-0)', marginBottom: '6px' }}>
+            Player Comparison
+          </h1>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+            Head-to-head at any salary ask
           </p>
         </div>
 
-        {/* Input card */}
-        <div className="fade-up-1 bg-scout-card border border-scout-border rounded-2xl p-6 mb-6 shadow-card">
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <PlayerSearch label="Player 1" value={name1} onChange={setName1} players={players} salary={salary1} onSalary={setSalary1} />
-            <PlayerSearch label="Player 2" value={name2} onChange={setName2} players={players} salary={salary2} onSalary={setSalary2} />
+        {/* ── Player inputs ────────────────────────── */}
+        <div className="fade-up-1" style={{ marginBottom: '1px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', marginBottom: '1px' }}>
+            <PlayerSearch label="PLAYER 1" value={name1} onChange={setName1} players={players} salary={salary1} onSalary={setSalary1} />
+            <PlayerSearch label="PLAYER 2" value={name2} onChange={setName2} players={players} salary={salary2} onSalary={setSalary2} />
           </div>
 
-          <button
-            onClick={runCompare}
-            disabled={!canRun || loading}
-            className="w-full py-3 rounded-xl font-mono text-sm font-bold uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: canRun && !loading ? 'linear-gradient(135deg, #00C9E0, #0099B8)' : undefined,
-              backgroundColor: !canRun || loading ? '#1c2333' : undefined,
-              color: canRun && !loading ? '#050810' : '#4B5C6B',
-              boxShadow: canRun && !loading ? '0 0 20px rgba(0,201,224,0.25)' : 'none',
-            }}
+          <button onClick={runCompare} disabled={!canRun || loading} style={{
+            width: '100%', padding: '11px 16px',
+            background: canRun && !loading ? 'var(--text-0)' : 'var(--bg-3)',
+            color: canRun && !loading ? 'var(--bg-0)' : 'var(--text-3)',
+            border: 'none', borderRadius: 'var(--r-md)',
+            fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 500,
+            cursor: canRun && !loading ? 'pointer' : 'not-allowed',
+            letterSpacing: '-0.1px', transition: 'opacity 0.15s ease',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}
+            onMouseEnter={e => { if (canRun && !loading) e.currentTarget.style.opacity = '0.88' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
           >
-            {loading ? 'Analyzing...' : 'Compare Players →'}
+            {loading ? (
+              <>
+                <span style={{ width: '12px', height: '12px', border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                Analyzing...
+              </>
+            ) : 'Compare Players →'}
           </button>
 
           {error && (
-            <div className="mt-4 font-mono text-xs text-scout-red bg-scout-red/10 border border-scout-red/20 rounded-lg px-4 py-3">
+            <div style={{ marginTop: '8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--red)', background: 'var(--red-subtle)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '10px 14px' }}>
               {error}
             </div>
           )}
         </div>
 
-        {/* Results */}
+        {/* ── Results ──────────────────────────────── */}
         {result && (
-          <div className="fade-up space-y-5">
+          <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '1px' }}>
 
-            {/* Winner banner */}
-            <div className="bg-scout-teal/5 border border-scout-teal/30 rounded-2xl p-5 text-center">
-              <p className="font-mono text-[10px] text-scout-muted uppercase tracking-[2px] mb-1">Better Value</p>
-              <p className="font-mono text-2xl font-bold text-scout-teal">
+            {/* Winner panel */}
+            <div style={{
+              background: 'var(--bg-1)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)', padding: '24px', textAlign: 'center',
+            }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                Better Value
+              </p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', fontWeight: 600, letterSpacing: '-0.6px', color: 'var(--text-0)', marginBottom: '6px' }}>
                 {winner === 1 ? result.p1.player : result.p2.player}
               </p>
-              <p className="font-mono text-xs text-scout-muted mt-1">
-                Health-adjusted value: {fmtMoney(winner === 1 ? result.val1.health_adjusted_value_m : result.val2.health_adjusted_value_m)}
-                {' · '}salary ask: ${winner === 1 ? salary1 : salary2}M
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>
+                Health-adjusted {fmtMoney(winner === 1 ? result.val1.health_adjusted_value_m : result.val2.health_adjusted_value_m)}
+                {' · '}salary ask ${winner === 1 ? salary1 : salary2}M
               </p>
 
-              {/* AI Verdict */}
-              <div className="mt-4 pt-4 border-t border-scout-teal/20">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="font-mono text-[9px] text-scout-teal/60 uppercase tracking-widest">AI Analysis</span>
-                  <span className="font-mono text-[9px] text-scout-muted uppercase tracking-widest">· Powered by Gemini</span>
-                </div>
+              {/* AI verdict */}
+              <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', marginBottom: '10px' }}>
+                  AI Analysis · Gemini 2.0 Flash
+                </p>
                 {aiLoading ? (
-                  <p className="font-mono text-xs text-scout-muted animate-pulse">Generating analysis...</p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+                    <span style={{ display: 'inline-block', animation: 'pulse 1.5s ease infinite' }}>Generating analysis...</span>
+                  </p>
                 ) : aiVerdict ? (
-                  <p className="font-mono text-sm text-scout-text leading-relaxed max-w-lg mx-auto">
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-1)', lineHeight: 1.7, maxWidth: '520px', margin: '0 auto' }}>
                     {aiVerdict}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            {/* Head to head table */}
-            <div className="bg-scout-card border border-scout-border rounded-2xl p-5 shadow-card">
-              <div className="grid grid-cols-3 gap-2 mb-4 pb-3 border-b border-scout-border/40">
-                <p className="font-mono text-sm font-bold text-scout-teal text-right truncate">{result.p1.player}</p>
-                <p className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">Metric</p>
-                <p className="font-mono text-sm font-bold text-scout-gold text-left truncate">{result.p2.player}</p>
+            {/* H2H table */}
+            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '20px 24px' }}>
+              {/* Column headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)', textAlign: 'right' }}>{result.p1.player}</p>
+                <div style={{ minWidth: '80px' }} />
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)', textAlign: 'left' }}>{result.p2.player}</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 py-2 border-b border-scout-border/30">
-                <div className="text-right"><DecisionBadge decision={result.val1.decision} /></div>
-                <div className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">Decision</div>
-                <div className="text-left"><DecisionBadge decision={result.val2.decision} /></div>
+              {/* Decision row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ textAlign: 'right' }}><VerdictBadge decision={result.val1.decision} /></div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Decision</div>
+                <div style={{ textAlign: 'left' }}><VerdictBadge decision={result.val2.decision} /></div>
               </div>
 
               <StatRow label="Fair Value"   v1={result.val1.fair_value_m}            v2={result.val2.fair_value_m}            format={fmtMoney} />
               <StatRow label="Salary Ask"   v1={salary1}                             v2={salary2}                             format={v => `$${v}M`} higherIsBetter={false} />
-              <StatRow label="Efficiency"   v1={result.val1.efficiency_ratio}        v2={result.val2.efficiency_ratio}        format={v => `${v?.toFixed(2)}x`} />
+              <StatRow label="Efficiency"   v1={result.val1.efficiency_ratio}        v2={result.val2.efficiency_ratio}        format={v => `${v?.toFixed(2)}×`} />
               <StatRow label="Health-Adj."  v1={result.val1.health_adjusted_value_m} v2={result.val2.health_adjusted_value_m} format={fmtMoney} />
               <StatRow label="Wins Added"   v1={result.sim1.wins_added}              v2={result.sim2.wins_added}              format={v => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-              <StatRow label="Impact Score" v1={result.p1.impact_score}              v2={result.p2.impact_score}              format={v => v.toFixed(2)} />
+              <StatRow label="Impact"       v1={result.p1.impact_score}              v2={result.p2.impact_score}              format={v => v.toFixed(2)} />
               <StatRow label="Durability"   v1={result.val1.durability_score}        v2={result.val2.durability_score}        format={v => v.toFixed(2)} />
 
-              <div className="grid grid-cols-3 gap-2 py-2 border-b border-scout-border/30">
-                <div className="text-right"><RiskLabel value={result.val1.risk_label} /></div>
-                <div className="font-mono text-[10px] text-scout-muted uppercase tracking-wider text-center self-center">Risk</div>
-                <div className="text-left"><RiskLabel value={result.val2.risk_label} /></div>
+              {/* Risk row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ textAlign: 'right' }}><RiskLabel value={result.val1.risk_label} /></div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Risk</div>
+                <div style={{ textAlign: 'left' }}><RiskLabel value={result.val2.risk_label} /></div>
               </div>
 
               <StatRow label="PTS" v1={result.p1.stats?.pts}    v2={result.p2.stats?.pts}    format={v => v.toFixed(1)} />
@@ -298,44 +333,38 @@ export default function CompareScreen({ onBack, players }) {
               <StatRow label="GP"  v1={result.p1.gp}            v2={result.p2.gp}            format={v => `${v}/82`} />
             </div>
 
-            {/* Verdict cards */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Per-player verdict cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
               {[
                 { p: result.p1, val: result.val1, salary: salary1, isWinner: winner === 1 },
                 { p: result.p2, val: result.val2, salary: salary2, isWinner: winner === 2 },
-              ].map(({ p, val, salary, isWinner }, i) => (
-                <div key={i} className={`bg-scout-card rounded-2xl p-5 border shadow-card ${isWinner ? 'border-scout-teal/40' : 'border-scout-border'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-mono text-sm font-bold text-scout-text truncate">{p.player}</p>
+              ].map(({ p, val, salary, isWinner }) => (
+                <div key={p.player} style={{ background: 'var(--bg-1)', padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)' }}>{p.player}</p>
                     {isWinner && (
-                      <span className="font-mono text-[9px] text-scout-teal border border-scout-teal/30 px-2 py-0.5 rounded-full">
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--green)', border: '1px solid var(--green-border)', padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.3px' }}>
                         BETTER DEAL
                       </span>
                     )}
                   </div>
-                  <DecisionBadge decision={val.decision} />
-                  <div className="mt-3 space-y-1.5">
-                    <div className="flex justify-between font-mono text-[10px]">
-                      <span className="text-scout-muted">Fair Value</span>
-                      <span className={val.fair_value_m < 0 ? 'text-scout-red' : 'text-scout-teal'}>{fmtMoney(val.fair_value_m)}</span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[10px]">
-                      <span className="text-scout-muted">Salary Ask</span>
-                      <span className="text-scout-gold">${salary}M</span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[10px]">
-                      <span className="text-scout-muted">Efficiency</span>
-                      <span className="text-scout-text">{val.efficiency_ratio?.toFixed(2) ?? 'N/A'}x</span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[10px]">
-                      <span className="text-scout-muted">Health-Adj.</span>
-                      <span className={val.health_adjusted_value_m < 0 ? 'text-scout-red' : 'text-scout-text'}>{fmtMoney(val.health_adjusted_value_m)}</span>
-                    </div>
-                    <div className="flex justify-between font-mono text-[10px]">
-                      <span className="text-scout-muted">Risk</span>
-                      <RiskLabel value={val.risk_label} />
-                    </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <VerdictBadge decision={val.decision} />
                   </div>
+                  {[
+                    { label: 'Fair Value',   value: fmtMoney(val.fair_value_m),              color: val.fair_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
+                    { label: 'Salary Ask',   value: `$${salary}M`,                           color: 'var(--text-0)' },
+                    { label: 'Efficiency',   value: `${val.efficiency_ratio?.toFixed(2) ?? 'N/A'}×`, color: 'var(--text-0)' },
+                    { label: 'Health-Adj.',  value: fmtMoney(val.health_adjusted_value_m),   color: val.health_adjusted_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
+                    { label: 'Risk',         value: <RiskLabel value={val.risk_label} />,     color: null },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{label}</span>
+                      {color
+                        ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color }}>{value}</span>
+                        : value}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -343,6 +372,13 @@ export default function CompareScreen({ onBack, players }) {
           </div>
         )}
       </div>
+      <style>{`
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+        input::placeholder { color: var(--text-3); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+      `}</style>
     </div>
   )
 }

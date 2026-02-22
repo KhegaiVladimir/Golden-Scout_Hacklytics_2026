@@ -1,4 +1,4 @@
-import ReportCard from '../components/ReportCard'
+import ReportCard  from '../components/ReportCard'
 import VoiceButton from '../components/VoiceButton'
 
 export default function ReportScreen({ data, onBack }) {
@@ -6,39 +6,77 @@ export default function ReportScreen({ data, onBack }) {
   if (!profile) return null
 
   return (
-    <main className="max-w-3xl mx-auto px-6 py-8 fade-up">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-1">
-          <h2 className="text-3xl font-bold text-scout-text">Executive Report</h2>
-          <span className="font-mono text-[10px] text-scout-muted border border-scout-border rounded-lg px-2.5 py-1 bg-scout-card">
-            Powered by Gemini
+    <main style={{ maxWidth: '720px', margin: '0 auto', padding: '40px 24px 48px' }}
+      className="fade-up">
+
+      {/* ── Header ───────────────────────────────── */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 600, letterSpacing: '-0.6px', color: 'var(--text-0)' }}>
+            Executive Report
+          </h2>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '10px',
+            color: 'var(--text-3)', padding: '2px 8px',
+            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+            background: 'var(--bg-1)', letterSpacing: '0.3px',
+          }}>
+            Gemini 2.0 Flash
           </span>
         </div>
-        <p className="font-mono text-sm text-scout-muted">{profile.player}</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+          {profile.player}
+        </p>
       </div>
 
-      <div className="mb-6">
+      {/* ── Report card ──────────────────────────── */}
+      <div style={{ marginBottom: '1px' }}>
         <ReportCard report={report} />
       </div>
 
-      <div className="bg-scout-card border border-scout-border rounded-2xl p-8 flex flex-col items-center mb-8 shadow-card">
+      {/* ── Voice panel ──────────────────────────── */}
+      <div style={{
+        background: 'var(--bg-1)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-lg)',
+        padding: '32px 24px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginBottom: '32px',
+      }}>
         <VoiceButton
           audioSummary={report?.audio_summary ?? ''}
           playerName={profile.player}
         />
 
-        {/* Текст для тех кто не хочет слушать */}
         {report?.audio_summary && (
-          <p className="font-mono text-[11px] text-scout-muted text-center leading-relaxed mt-6 max-w-md border-t border-scout-border/40 pt-5">
+          <p style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            color: 'var(--text-2)', textAlign: 'center',
+            lineHeight: 1.75, marginTop: '24px',
+            maxWidth: '480px',
+            paddingTop: '20px',
+            borderTop: '1px solid var(--border)',
+          }}>
             {report.audio_summary}
           </p>
         )}
       </div>
 
-      <button onClick={onBack}
-        className="font-mono text-sm text-scout-muted hover:text-scout-text transition-colors">
+      {/* ── Navigation ───────────────────────────── */}
+      <button onClick={onBack} style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        fontFamily: 'var(--font-mono)', fontSize: '12px',
+        color: 'var(--text-3)', transition: 'color 0.15s ease',
+        padding: '8px 0',
+      }}
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+      >
         ← Back
       </button>
+
     </main>
   )
 }

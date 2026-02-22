@@ -1,38 +1,26 @@
+// TradeScreen.jsx
 import { useState, useEffect, useRef } from 'react'
 import { fetchPlayers, simulateTrade } from '../api/client'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ReferenceLine
+  Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 
-// Bin 10k raw ints into histogram bins
 function binDistribution(dist, binSize = 3) {
   if (!dist?.length) return []
-  const min = Math.min(...dist)
-  const max = Math.max(...dist)
+  const min = Math.min(...dist), max = Math.max(...dist)
   const bins = {}
   for (let w = min; w <= max; w += binSize) bins[w] = 0
-  dist.forEach(w => {
-    const bin = Math.floor(w / binSize) * binSize
-    bins[bin] = (bins[bin] || 0) + 1
-  })
-  return Object.entries(bins)
-    .map(([wins, count]) => ({ wins: Number(wins), count }))
-    .sort((a, b) => a.wins - b.wins)
+  dist.forEach(w => { const bin = Math.floor(w / binSize) * binSize; bins[bin] = (bins[bin] || 0) + 1 })
+  return Object.entries(bins).map(([wins, count]) => ({ wins: Number(wins), count })).sort((a, b) => a.wins - b.wins)
 }
 
-// Merge before/after into one array for overlaid chart
 function mergeDistributions(before, after, binSize = 3) {
-  const b = binDistribution(before, binSize)
-  const a = binDistribution(after, binSize)
+  const b = binDistribution(before, binSize), a = binDistribution(after, binSize)
   const winsSet = new Set([...b.map(d => d.wins), ...a.map(d => d.wins)])
   const bMap = Object.fromEntries(b.map(d => [d.wins, d.count]))
   const aMap = Object.fromEntries(a.map(d => [d.wins, d.count]))
-  return Array.from(winsSet).sort((x, y) => x - y).map(wins => ({
-    wins,
-    before: bMap[wins] || 0,
-    after:  aMap[wins] || 0,
-  }))
+  return Array.from(winsSet).sort((x, y) => x - y).map(wins => ({ wins, before: bMap[wins] || 0, after: aMap[wins] || 0 }))
 }
 
 function PlayerSearch({ label, value, onChange, players, placeholder }) {
@@ -44,297 +32,343 @@ function PlayerSearch({ label, value, onChange, players, placeholder }) {
   useEffect(() => {
     if (query.length < 2) { setFiltered([]); setOpen(false); return }
     const f = players.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
-    setFiltered(f)
-    setOpen(f.length > 0)
+    setFiltered(f); setOpen(f.length > 0)
   }, [query, players])
 
   useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    const handler = e => { if (!ref.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const select = (name) => {
-    setQuery(name)
-    onChange(name)
-    setOpen(false)
-  }
+  const select = name => { setQuery(name); onChange(name); setOpen(false) }
 
   return (
-    <div ref={ref} className="relative">
-      <label className="block font-mono text-xs text-scout-muted uppercase tracking-widest mb-2">{label}</label>
-      <input
-        value={query}
-        onChange={e => { setQuery(e.target.value); onChange('') }}
-        placeholder={placeholder}
-        className="w-full bg-scout-card2 border border-scout-border rounded-xl px-4 py-3 font-mono text-sm text-scout-text placeholder-scout-muted focus:outline-none focus:border-scout-teal transition-colors"
-      />
-      {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-scout-card border border-scout-border rounded-xl overflow-hidden shadow-card">
-          {filtered.map(name => (
-            <button
-              key={name}
-              onClick={() => select(name)}
-              className="w-full text-left px-4 py-2.5 font-mono text-sm text-scout-text hover:bg-scout-card2 transition-colors"
-            >
-              {name}
-            </button>
-          ))}
+    <div>
+      <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '8px' }}>
+        {label}
+      </label>
+      <div ref={ref} style={{ position: 'relative' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          background: 'var(--bg-0)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)', padding: '0 4px 0 12px',
+        }}
+          onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--border-active)'}
+          onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border)'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input
+            value={query}
+            onChange={e => { setQuery(e.target.value); onChange('') }}
+            placeholder={placeholder}
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              fontFamily: 'var(--font-sans)', fontSize: '13px',
+              color: 'var(--text-0)', padding: '10px 8px',
+            }}
+          />
         </div>
-      )}
+        {open && (
+          <ul style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+            background: 'var(--bg-1)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-md)', overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)', listStyle: 'none',
+          }}>
+            {filtered.map(name => (
+              <li key={name} onClick={() => select(name)} style={{
+                padding: '9px 14px', fontFamily: 'var(--font-sans)', fontSize: '13px',
+                cursor: 'pointer', color: 'var(--text-1)',
+                borderBottom: '1px solid var(--border)',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-0)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-1)' }}
+              >
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <style>{`input::placeholder { color: var(--text-3); }`}</style>
     </div>
   )
 }
 
-function DeltaCard({ label, value, format, positive }) {
-  const isPositive = positive ?? value > 0
-  const isNeutral  = value === 0
-  const color = isNeutral ? 'text-scout-muted' : isPositive ? 'text-scout-green' : 'text-scout-red'
-  const bg    = isNeutral ? '' : isPositive ? 'bg-scout-green/5 border-scout-green/20' : 'bg-scout-red/5 border-scout-red/20'
+function DeltaPanel({ label, value, format, positive }) {
+  const isPos     = positive ?? value > 0
+  const isNeutral = value === 0
+  const color = isNeutral ? 'var(--text-3)' : isPos ? 'var(--green)' : 'var(--red)'
+  const subtle = isNeutral ? 'transparent' : isPos ? 'var(--green-subtle)' : 'var(--red-subtle)'
+  const border = isNeutral ? 'var(--border)' : isPos ? 'var(--green-border)' : 'var(--red-border)'
 
   return (
-    <div className={`bg-scout-card border ${bg || 'border-scout-border'} rounded-2xl p-5 text-center`}>
-      <div className="font-mono text-xs text-scout-muted uppercase tracking-widest mb-2">{label}</div>
-      <div className={`font-mono text-3xl font-bold ${color}`}>
+    <div style={{
+      background: 'var(--bg-1)', border: `1px solid ${border}`,
+      borderRadius: 'var(--r-lg)', padding: '20px 24px',
+      background: subtle !== 'transparent' ? subtle : 'var(--bg-1)',
+      transition: 'background 0.15s ease',
+    }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '10px' }}>
+        {label}
+      </p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '26px', fontWeight: 600, letterSpacing: '-0.6px', color }}>
         {value > 0 ? '+' : ''}{format(value)}
-      </div>
+      </p>
+    </div>
+  )
+}
+
+function CustomTooltip({ active, payload, playerInName }) {
+  if (!active || !payload?.length) return null
+  const { wins, before, after } = payload[0].payload
+  const lastName = playerInName?.split(' ').pop() ?? ''
+  return (
+    <div style={{
+      background: 'var(--bg-1)', border: '1px solid var(--border)',
+      borderRadius: 'var(--r-sm)', padding: '8px 12px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+    }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', marginBottom: '4px' }}>{wins} wins</p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)', marginBottom: '2px' }}>
+        Before: <span style={{ color: 'var(--text-0)', fontWeight: 600 }}>{before}</span>
+      </p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+        With {lastName}: <span style={{ color: 'var(--green)', fontWeight: 600 }}>{after}</span>
+      </p>
     </div>
   )
 }
 
 export default function TradeScreen({ onBack, players: propPlayers }) {
-  const [players, setPlayers]     = useState(propPlayers || [])
+  const [players,   setPlayers]   = useState(propPlayers || [])
   const [playerOut, setPlayerOut] = useState('')
   const [playerIn,  setPlayerIn]  = useState('')
   const [teamWins,  setTeamWins]  = useState(38)
-  const [loading, setLoading]     = useState(false)
-  const [result,  setResult]      = useState(null)
-  const [error,   setError]       = useState(null)
+  const [loading,   setLoading]   = useState(false)
+  const [result,    setResult]    = useState(null)
+  const [error,     setError]     = useState(null)
 
-  useEffect(() => {
-    if (!propPlayers?.length) fetchPlayers().then(setPlayers)
-  }, [propPlayers])
+  useEffect(() => { if (!propPlayers?.length) fetchPlayers().then(setPlayers) }, [propPlayers])
 
   const canRun = playerOut && playerIn && playerOut !== playerIn
 
   const handleRun = async () => {
     if (!canRun) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
+    setLoading(true); setError(null); setResult(null)
     const data = await simulateTrade(playerOut, playerIn, teamWins)
-    if (!data) {
-      setError('Trade simulation failed. Check player names and try again.')
-    } else {
-      setResult(data)
-    }
+    if (!data) setError('Trade simulation failed. Check player names and try again.')
+    else setResult(data)
     setLoading(false)
   }
 
-  const chartData = result
-    ? mergeDistributions(result.before.win_distribution, result.after.win_distribution)
-    : []
-
+  const chartData   = result ? mergeDistributions(result.before.win_distribution, result.after.win_distribution) : []
   const deltaWins   = result?.delta?.wins        ?? 0
   const deltaProb   = result?.delta?.playoff_prob ?? 0
   const deltaSalary = result?.delta?.salary_m     ?? 0
 
   return (
-    <div className="min-h-screen bg-scout-bg pt-20 pb-16">
-      <div className="max-w-5xl mx-auto px-6">
+    <div style={{ minHeight: '100vh', paddingTop: '72px', paddingBottom: '64px' }}>
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 24px' }}>
 
-        {/* Header */}
-        <div className="fade-up mb-10">
-          <button onClick={onBack} className="font-mono text-xs text-scout-muted hover:text-scout-teal transition-colors mb-6 flex items-center gap-2">
+        {/* ── Header ───────────────────────────────── */}
+        <div className="fade-up" style={{ marginBottom: '40px' }}>
+          <button onClick={onBack} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: '12px',
+            color: 'var(--text-3)', marginBottom: '24px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            transition: 'color 0.15s ease', padding: 0,
+          }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+          >
             ← Back
           </button>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="font-mono text-xs bg-scout-teal/10 text-scout-teal border border-scout-teal/20 px-3 py-1 rounded-full uppercase tracking-widest">
-              Trade Simulator
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-scout-text">
-            Trade Impact Simulator
+          <h1 style={{ fontSize: '28px', fontWeight: 600, letterSpacing: '-0.6px', color: 'var(--text-0)', marginBottom: '6px' }}>
+            Trade Simulator
           </h1>
-          <p className="text-scout-muted font-mono text-sm mt-2">
-            How does your win distribution shift if you make this trade?
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+            How does your win distribution shift when you make this trade?
           </p>
         </div>
 
-        {/* Input card */}
-        <div className="fade-up-1 bg-scout-card border border-scout-border rounded-2xl p-6 mb-6 shadow-card">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* ── Input panel ──────────────────────────── */}
+        <div className="fade-up-1" style={{
+          background: 'var(--bg-1)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)', padding: '24px', marginBottom: '1px',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <PlayerSearch
-                label="Trading Away"
-                value={playerOut}
-                onChange={setPlayerOut}
-                players={players}
-                placeholder="Player leaving your team..."
-              />
+              <PlayerSearch label="TRADING AWAY" value={playerOut} onChange={setPlayerOut} players={players} placeholder="Player leaving your team..." />
               {result && (
-                <div className="mt-2 font-mono text-xs text-scout-muted">
-                  Impact: <span className="text-scout-red">{result.player_out.impact_score.toFixed(3)}</span>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', marginTop: '8px' }}>
+                  Impact <span style={{ color: 'var(--red)' }}>{result.player_out.impact_score.toFixed(3)}</span>
                   {' · '}{result.player_out.position}
-                  {' · '}<span className="text-scout-text">${result.player_out.salary_m.toFixed(1)}M</span>
-                </div>
+                  {' · '}<span style={{ color: 'var(--text-1)' }}>${result.player_out.salary_m.toFixed(1)}M</span>
+                </p>
               )}
             </div>
-
             <div>
-              <PlayerSearch
-                label="Receiving"
-                value={playerIn}
-                onChange={setPlayerIn}
-                players={players}
-                placeholder="Player joining your team..."
-              />
+              <PlayerSearch label="RECEIVING" value={playerIn} onChange={setPlayerIn} players={players} placeholder="Player joining your team..." />
               {result && (
-                <div className="mt-2 font-mono text-xs text-scout-muted">
-                  Impact: <span className="text-scout-green">{result.player_in.impact_score.toFixed(3)}</span>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', marginTop: '8px' }}>
+                  Impact <span style={{ color: 'var(--green)' }}>{result.player_in.impact_score.toFixed(3)}</span>
                   {' · '}{result.player_in.position}
-                  {' · '}<span className="text-scout-text">${result.player_in.salary_m.toFixed(1)}M</span>
-                </div>
+                  {' · '}<span style={{ color: 'var(--text-1)' }}>${result.player_in.salary_m.toFixed(1)}M</span>
+                </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-end gap-6">
-            <div>
-              <label className="block font-mono text-xs text-scout-muted uppercase tracking-widest mb-2">
-                Current Team Wins
+          {/* Team wins + button */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+            <div style={{
+              background: 'var(--bg-0)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)', padding: '12px 16px', width: '120px',
+            }}>
+              <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                TEAM WINS
               </label>
               <input
-                type="number"
-                min={0} max={82}
-                value={teamWins}
+                type="number" min={0} max={82} value={teamWins}
                 onChange={e => setTeamWins(Number(e.target.value))}
-                className="w-32 bg-scout-card2 border border-scout-border rounded-xl px-4 py-3 font-mono text-sm text-scout-text focus:outline-none focus:border-scout-teal transition-colors"
+                style={{
+                  width: '100%', background: 'none', border: 'none', outline: 'none',
+                  fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 600,
+                  color: 'var(--text-0)', letterSpacing: '-0.5px', MozAppearance: 'textfield',
+                }}
               />
             </div>
 
             <button
               onClick={handleRun}
               disabled={!canRun || loading}
-              className="flex-1 py-3 rounded-xl font-mono text-sm font-bold uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: canRun && !loading
-                  ? 'linear-gradient(135deg, #00C9E0, #0099B8)'
-                  : undefined,
-                backgroundColor: !canRun || loading ? '#1c2333' : undefined,
-                color: canRun && !loading ? '#050810' : '#4B5C6B',
-                boxShadow: canRun && !loading ? '0 0 20px rgba(0,201,224,0.25)' : 'none',
+                flex: 1, padding: '11px 16px',
+                background: canRun && !loading ? 'var(--text-0)' : 'var(--bg-3)',
+                color: canRun && !loading ? 'var(--bg-0)' : 'var(--text-3)',
+                border: 'none', borderRadius: 'var(--r-md)',
+                fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 500,
+                cursor: canRun && !loading ? 'pointer' : 'not-allowed',
+                letterSpacing: '-0.1px', transition: 'opacity 0.15s ease',
               }}
+              onMouseEnter={e => { if (canRun && !loading) e.currentTarget.style.opacity = '0.88' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
             >
-              {loading ? 'Simulating 10,000 seasons...' : 'Simulate Trade →'}
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span style={{ width: '12px', height: '12px', border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                  Simulating 10,000 seasons...
+                </span>
+              ) : 'Simulate Trade →'}
             </button>
           </div>
 
           {error && (
-            <div className="mt-4 font-mono text-xs text-scout-red bg-scout-red/10 border border-scout-red/20 rounded-lg px-4 py-3">
+            <div style={{ marginTop: '12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--red)', background: 'var(--red-subtle)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '10px 14px' }}>
               {error}
             </div>
           )}
         </div>
 
-        {/* Results */}
+        {/* ── Results ──────────────────────────────── */}
         {result && (
           <>
-            {/* Delta cards */}
-            <div className="fade-up grid grid-cols-3 gap-4 mb-6">
-              <DeltaCard
-                label="Win Change"
-                value={deltaWins}
-                format={v => `${v} W`}
-              />
-              <DeltaCard
-                label="Playoff Probability"
-                value={deltaProb}
-                format={v => `${v}%`}
-              />
-              <DeltaCard
-                label="Salary Impact"
-                value={deltaSalary}
-                format={v => `$${Math.abs(v).toFixed(1)}M`}
-                positive={deltaSalary <= 0}
-              />
+            {/* Delta strip */}
+            <div className="fade-up" style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '1px', background: 'var(--border)',
+              borderRadius: 'var(--r-lg)', overflow: 'hidden',
+              marginTop: '1px', marginBottom: '1px',
+            }}>
+              <DeltaPanel label="Win Change"          value={deltaWins}   format={v => `${v}W`} />
+              <DeltaPanel label="Playoff Probability" value={deltaProb}   format={v => `${v}%`} />
+              <DeltaPanel label="Salary Impact"       value={deltaSalary} format={v => `$${Math.abs(v).toFixed(1)}M`} positive={deltaSalary <= 0} />
             </div>
 
-            {/* Overlaid histogram */}
-            <div className="fade-up-1 bg-scout-card border border-scout-border rounded-2xl p-6 shadow-card">
-              <div className="flex items-center justify-between mb-6">
+            {/* Chart */}
+            <div className="fade-up-1" style={{
+              background: 'var(--bg-1)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)', padding: '24px',
+              marginBottom: '1px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h2 className="font-mono text-sm font-bold text-scout-text uppercase tracking-widest">
-                    Win Distribution Shift
-                  </h2>
-                  <p className="font-mono text-xs text-scout-muted mt-1">
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.3px', marginBottom: '3px' }}>
+                    Win distribution shift
+                  </p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', opacity: 0.6 }}>
                     10,000 simulated seasons — before vs. after trade
                   </p>
                 </div>
-                <div className="flex items-center gap-6 font-mono text-xs">
-                  <span className="flex items-center gap-2">
-                    <span className="w-8 h-0.5 bg-scout-red inline-block rounded" />
-                    <span className="text-scout-muted">Without {result.player_in.name.split(' ').pop()}</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="w-8 h-0.5 bg-scout-teal inline-block rounded" />
-                    <span className="text-scout-muted">With {result.player_in.name.split(' ').pop()}</span>
-                  </span>
+                <div style={{ display: 'flex', gap: '16px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', alignItems: 'center' }}>
+                  {[
+                    { color: 'var(--text-3)', label: `Without ${result.player_in.name?.split(' ').pop()}` },
+                    { color: 'var(--text-0)', label: `With ${result.player_in.name?.split(' ').pop()}` },
+                  ].map(({ color, label }) => (
+                    <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '20px', height: '1px', background: color, display: 'inline-block' }} />
+                      {label}
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1c2333" />
-                  <XAxis
-                    dataKey="wins"
-                    tick={{ fill: '#4B5C6B', fontFamily: 'DM Mono', fontSize: 11 }}
-                    label={{ value: 'Season Wins', position: 'insideBottom', offset: -2, fill: '#4B5C6B', fontFamily: 'DM Mono', fontSize: 11 }}
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="wins" tick={{ fill: '#444444', fontSize: 10, fontFamily: 'Geist Mono, monospace' }} axisLine={{ stroke: 'rgba(255,255,255,0.06)' }} tickLine={false}
+                    label={{ value: 'Season Wins', position: 'insideBottom', offset: -8, fill: '#444444', fontSize: 10, fontFamily: 'Geist Mono, monospace' }}
                   />
                   <YAxis hide />
-                  <Tooltip
-                    contentStyle={{ background: '#0d1117', border: '1px solid #1c2333', borderRadius: 8, fontFamily: 'DM Mono', fontSize: 12 }}
-                    labelStyle={{ color: '#8899AA' }}
-                    formatter={(val, name) => [val, name === 'before' ? `Without ${result.player_in.name.split(' ').pop()}` : `With ${result.player_in.name.split(' ').pop()}`]}
-                    labelFormatter={l => `${l} wins`}
+                  <Tooltip content={<CustomTooltip playerInName={result.player_in.name} />} cursor={{ stroke: 'rgba(255,255,255,0.06)' }} />
+                  <ReferenceLine x={41} stroke="rgba(255,255,255,0.10)" strokeDasharray="3 3" strokeWidth={1}
+                    label={{ value: 'Playoff', fill: '#444444', fontSize: 9, fontFamily: 'Geist Mono, monospace' }}
                   />
-                  <ReferenceLine x={41} stroke="#4B5C6B" strokeDasharray="4 4" label={{ value: 'Playoff', fill: '#4B5C6B', fontSize: 10, fontFamily: 'DM Mono' }} />
-                  <Line type="monotone" dataKey="before" stroke="#EF4444" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="after"  stroke="#00C9E0" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="before" stroke="rgba(255,255,255,0.15)" strokeWidth={1.5} dot={false} />
+                  <Line type="monotone" dataKey="after"  stroke="rgba(255,255,255,0.70)" strokeWidth={1.5} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
-            {/* Summary row */}
-            <div className="fade-up-2 mt-6 bg-scout-card border border-scout-border rounded-2xl p-5 shadow-card">
-              <div className="grid grid-cols-2 gap-8 font-mono text-sm">
-                <div>
-                  <div className="text-scout-muted text-xs uppercase tracking-widest mb-3">Before Trade</div>
-                  <div className="flex justify-between py-1.5 border-b border-scout-border/40">
-                    <span className="text-scout-muted">Expected Wins</span>
-                    <span className="text-scout-text">{result.before.expected_wins}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-scout-muted">Playoff Probability</span>
-                    <span className="text-scout-text">{result.before.playoff_prob}%</span>
-                  </div>
+            {/* Before / After summary */}
+            <div className="fade-up-2" style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr',
+              gap: '1px', background: 'var(--border)',
+              borderRadius: 'var(--r-lg)', overflow: 'hidden',
+            }}>
+              {[
+                { title: 'Before Trade', data: result.before, color: 'var(--text-0)', isAfter: false },
+                { title: 'After Trade',  data: result.after,  color: deltaWins >= 0 ? 'var(--green)' : 'var(--red)', isAfter: true },
+              ].map(({ title, data, color, isAfter }) => (
+                <div key={title} style={{ background: 'var(--bg-1)', padding: '20px 24px' }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '14px' }}>
+                    {title}
+                  </p>
+                  {[
+                    { label: 'Expected Wins', value: data.expected_wins },
+                    { label: 'Playoff Prob.', value: `${data.playoff_prob}%` },
+                  ].map(({ label, value }, i, arr) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>{label}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: isAfter ? color : 'var(--text-0)' }}>{value}</span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-scout-muted text-xs uppercase tracking-widest mb-3">After Trade</div>
-                  <div className="flex justify-between py-1.5 border-b border-scout-border/40">
-                    <span className="text-scout-muted">Expected Wins</span>
-                    <span className={deltaWins >= 0 ? 'text-scout-green' : 'text-scout-red'}>{result.after.expected_wins}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-scout-muted">Playoff Probability</span>
-                    <span className={deltaProb >= 0 ? 'text-scout-green' : 'text-scout-red'}>{result.after.playoff_prob}%</span>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </>
         )}
       </div>
+      <style>{`
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }

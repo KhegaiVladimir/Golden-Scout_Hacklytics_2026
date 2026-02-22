@@ -1,81 +1,222 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════
+   GOLDEN SCOUT — Linear / Vercel DNA
+   Near-black. Monochrome. Every pixel earns
+   its place.
+═══════════════════════════════════════════ */
+
+:root {
+  --bg-0:            #090909;
+  --bg-1:            #111111;
+  --bg-2:            #171717;
+  --bg-3:            #1C1C1C;
+  --bg-hover:        #1F1F1F;
+
+  --border:          rgba(255, 255, 255, 0.06);
+  --border-hover:    rgba(255, 255, 255, 0.10);
+  --border-active:   rgba(255, 255, 255, 0.15);
+
+  --text-0:          #FAFAFA;
+  --text-1:          #A1A1A1;
+  --text-2:          #666666;
+  --text-3:          #444444;
+
+  --green:           #30D158;
+  --green-subtle:    rgba(48, 209, 88, 0.12);
+  --green-border:    rgba(48, 209, 88, 0.20);
+
+  --amber:           #FFD60A;
+  --amber-subtle:    rgba(255, 214, 10, 0.10);
+  --amber-border:    rgba(255, 214, 10, 0.15);
+
+  --red:             #FF453A;
+  --red-subtle:      rgba(255, 69, 58, 0.10);
+  --red-border:      rgba(255, 69, 58, 0.15);
+
+  --blue:            #64D2FF;
+
+  --font-sans:       'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono:       'Geist Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+
+  --r-sm:   6px;
+  --r-md:   8px;
+  --r-lg:   12px;
+
+  --ease:   cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+html {
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
 
 body {
-  background-color: #050810;
-  color: #E2E8F0;
-  font-family: 'Inter', sans-serif;
-  min-height: 100vh;
+  background-color: var(--bg-0);
+  color:            var(--text-0);
+  font-family:      var(--font-sans);
+  font-size:        14px;
+  line-height:      1.6;
+  min-height:       100vh;
+  overflow-x:       hidden;
 }
 
-/* Dot grid background */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: radial-gradient(circle, #1c2333 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.4;
-}
+/* ═══ SCROLLBAR ═══ */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg-0); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 2px; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: #0d1117; }
-::-webkit-scrollbar-thumb { background: #1c2333; border-radius: 2px; }
-
-/* Skeleton shimmer */
+/* ═══ SKELETON SHIMMER ═══ */
 @keyframes shimmer {
   0%   { background-position: -600px 0; }
   100% { background-position:  600px 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #0d1117 25%, #1c2333 50%, #0d1117 75%);
+  background: linear-gradient(
+    90deg,
+    var(--bg-1) 25%,
+    var(--bg-2) 50%,
+    var(--bg-1) 75%
+  );
   background-size: 600px 100%;
   animation: shimmer 1.8s infinite;
-  border-radius: 8px;
+  border-radius: var(--r-md);
 }
 
-/* Screen entrance */
+/* ═══ SCREEN ENTRANCE ═══ */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.fade-up   { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both; }
-.fade-up-1 { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.05s both; }
-.fade-up-2 { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.12s both; }
-.fade-up-3 { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.19s both; }
-.fade-up-4 { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.26s both; }
+.fade-up   { animation: fadeUp 0.5s var(--ease) both; }
+.fade-up-1 { animation: fadeUp 0.5s var(--ease) 0.05s both; }
+.fade-up-2 { animation: fadeUp 0.5s var(--ease) 0.12s both; }
+.fade-up-3 { animation: fadeUp 0.5s var(--ease) 0.19s both; }
+.fade-up-4 { animation: fadeUp 0.5s var(--ease) 0.26s both; }
 
-/* Waveform animation */
-@keyframes wave1 { 0%,100%{height:6px}  50%{height:22px} }
-@keyframes wave2 { 0%,100%{height:14px} 50%{height:6px}  }
-@keyframes wave3 { 0%,100%{height:20px} 50%{height:30px} }
-@keyframes wave4 { 0%,100%{height:10px} 50%{height:26px} }
-@keyframes wave5 { 0%,100%{height:18px} 50%{height:8px}  }
-.wave-1 { animation: wave1 0.8s ease-in-out infinite; }
-.wave-2 { animation: wave2 0.9s ease-in-out infinite 0.1s; }
-.wave-3 { animation: wave3 0.7s ease-in-out infinite 0.2s; }
-.wave-4 { animation: wave4 1.0s ease-in-out infinite 0.15s; }
+/* ═══ WAVEFORM (voice button) ═══ */
+@keyframes wave1 { 0%,100%{height:4px}  50%{height:16px} }
+@keyframes wave2 { 0%,100%{height:10px} 50%{height:4px}  }
+@keyframes wave3 { 0%,100%{height:14px} 50%{height:22px} }
+@keyframes wave4 { 0%,100%{height:7px}  50%{height:18px} }
+@keyframes wave5 { 0%,100%{height:12px} 50%{height:6px}  }
+.wave-1 { animation: wave1 0.8s  ease-in-out infinite; }
+.wave-2 { animation: wave2 0.9s  ease-in-out infinite 0.10s; }
+.wave-3 { animation: wave3 0.7s  ease-in-out infinite 0.20s; }
+.wave-4 { animation: wave4 1.0s  ease-in-out infinite 0.15s; }
 .wave-5 { animation: wave5 0.85s ease-in-out infinite 0.05s; }
 
-/* Radar fade */
+/* ═══ RADAR ═══ */
 @keyframes radarIn {
-  from { opacity: 0; transform: scale(0.92); }
+  from { opacity: 0; transform: scale(0.94); }
   to   { opacity: 1; transform: scale(1); }
 }
-.radar-fade { animation: radarIn 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+.radar-fade { animation: radarIn 0.6s var(--ease) both; }
 
-/* Glow pulse on verdict */
-@keyframes glowPulse {
-  0%,100% { box-shadow: 0 0 20px rgba(0,201,224,0.1); }
-  50%     { box-shadow: 0 0 40px rgba(0,201,224,0.2); }
+/* ═══ HISTOGRAM BARS ═══ */
+@keyframes growUp {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
 }
-.glow-pulse { animation: glowPulse 3s ease-in-out infinite; }
+.bar-grow {
+  transform-origin: bottom;
+  animation: growUp 0.7s var(--ease) both;
+}
+
+/* ═══ COUNTER ROLL ═══ */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-in { animation: countUp 0.4s var(--ease) both; }
+
+/* ═══ VERDICT BADGE ENTRANCE ═══ */
+@keyframes badgeIn {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.badge-in { animation: badgeIn 0.35s var(--ease) 0.3s both; }
+
+/* ═══ VALUE BAR ═══ */
+@keyframes barFill {
+  from { width: 0%; }
+}
+.bar-fill { animation: barFill 1.4s var(--ease) 0.4s both; }
+
+/* ═══ UTILITY CLASSES ═══
+   These complement Tailwind for things that
+   need CSS-variable access.
+═══════════════════════════════════════════ */
+
+/* Card / panel base */
+.gs-card {
+  background:    var(--bg-1);
+  border:        1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.gs-card:hover { border-color: var(--border-hover); }
+
+/* The "gap-as-border" panel grid Linear uses */
+.gs-grid {
+  display:          grid;
+  gap:              1px;
+  background:       var(--border);
+  border-radius:    var(--r-lg);
+  overflow:         hidden;
+}
+.gs-grid > * { background: var(--bg-1); }
+
+/* Mono label */
+.gs-label {
+  font-family:    var(--font-mono);
+  font-size:      11px;
+  letter-spacing: 0.3px;
+  color:          var(--text-3);
+}
+
+/* Tag / pill */
+.gs-tag {
+  font-family:    var(--font-mono);
+  font-size:      11px;
+  color:          var(--text-2);
+  padding:        2px 8px;
+  border:         1px solid var(--border);
+  border-radius:  var(--r-sm);
+  background:     transparent;
+}
+
+/* Z-score badges */
+.z-high { background: var(--green-subtle); color: var(--green); }
+.z-mid  { background: var(--amber-subtle); color: var(--amber); }
+.z-low  { background: var(--red-subtle);   color: var(--red);   }
+
+/* Verdict chips */
+.verdict-sign {
+  background:   var(--green-subtle);
+  color:        var(--green);
+  border:       1px solid var(--green-border);
+}
+.verdict-negotiate {
+  background:   var(--amber-subtle);
+  color:        var(--amber);
+  border:       1px solid var(--amber-border);
+}
+.verdict-avoid {
+  background:   var(--red-subtle);
+  color:        var(--red);
+  border:       1px solid var(--red-border);
+}
+
+/* Thin separator */
+.gs-sep {
+  height:     1px;
+  background: var(--border);
+}
