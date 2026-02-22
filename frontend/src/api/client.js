@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { USE_MOCK, mockProfile, mockSimulation, mockValuation, mockReport } from '../mockData'
 
-const api = axios.create({ baseURL: 'http://localhost:8000' })
+const api = axios.create({ baseURL: 'https://golden-scout-hacklytics-2026.onrender.com' })
 
 export const fetchPlayers = async () => {
   if (USE_MOCK) return ["Jayson Tatum", "LeBron James", "Stephen Curry"]
