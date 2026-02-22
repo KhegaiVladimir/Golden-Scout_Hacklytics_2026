@@ -7,7 +7,6 @@ export default function ReportScreen({ data, onBack }) {
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-8 fade-up">
-
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
           <h2 className="text-3xl font-bold text-scout-text">Executive Report</h2>
@@ -27,6 +26,13 @@ export default function ReportScreen({ data, onBack }) {
           audioSummary={report?.audio_summary ?? ''}
           playerName={profile.player}
         />
+
+        {/* Текст для тех кто не хочет слушать */}
+        {report?.audio_summary && (
+          <p className="font-mono text-[11px] text-scout-muted text-center leading-relaxed mt-6 max-w-md border-t border-scout-border/40 pt-5">
+            {report.audio_summary}
+          </p>
+        )}
       </div>
 
       <button onClick={onBack}

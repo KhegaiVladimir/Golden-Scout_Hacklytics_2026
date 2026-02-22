@@ -121,36 +121,42 @@ export default function App() {
 
       // 3. Valuation
       const val = await calculateValue(sim.wins_added, salaryAsk, age, profile.gp, mpg)
-      console.log('valuation:', val) 
+      // FIX: убраны console.log из продакшена
+      if (import.meta.env.DEV) {
+        console.log('valuation:', val)
+        console.log('stats:', profile.stats)
+      }
       if (!val) {
         setError('Valuation failed. Please try again.')
         setLoading(false)
         return
       }
-      console.log(profile.stats)
 
       // 4. Report — non-critical, app works without it
       let rep = null
       try {
         rep = await generateReport({
-          player:             profile.player,
-          position:           profile.position,
-          impact_score:       profile.impact_score,
-          percentile:         profile.percentile,
-          trend_signal:       profile.trend_signal,
-          wins_added:         sim.wins_added,
-          expected_wins:      sim.expected_wins,
-          playoff_prob:       sim.playoff_prob,
-          fair_value_m:       val.fair_value_m,
-          efficiency_ratio:   val.efficiency_ratio,
-          overpay_pct:        val.overpay_pct,
-          decision:           val.decision,
-          absence_reason:     val.absence_reason   ?? 'full',
-          is_projected:       val.is_projected     ?? false,
-          projected_wins:     val.projected_wins,
-          requested_salary_m: salaryAsk,
-          current_team_wins:  teamWins,
-        })
+  player:             profile.player,
+  position:           profile.position,
+  impact_score:       profile.impact_score,
+  percentile:         profile.percentile,
+  trend_signal:       profile.trend_signal,
+  wins_added:         sim.wins_added,
+  expected_wins:      sim.expected_wins,
+  playoff_prob:       sim.playoff_prob,
+  fair_value_m:       val.fair_value_m,
+  efficiency_ratio:   val.efficiency_ratio,
+  overpay_pct:        val.overpay_pct,
+  decision:           val.decision,
+  absence_reason:     val.absence_reason   ?? 'full',
+  is_projected:       val.is_projected     ?? false,
+  projected_wins:     val.projected_wins,
+  requested_salary_m: salaryAsk,
+  current_team_wins:  teamWins,
+  gp:                 profile.gp,          // ← добавь
+  age:                profile.age,          // ← добавь
+  durability_score:   val.durability_score, // ← добавь
+})
       } catch {
         // Report failing shouldn't block the user — they can still see the decision
         console.warn('Report generation failed, continuing without it.')

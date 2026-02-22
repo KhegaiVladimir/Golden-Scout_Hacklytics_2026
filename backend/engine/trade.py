@@ -18,13 +18,12 @@ def simulate_trade(player_out: str, player_in: str, current_team_wins: int = 38)
 
     # Simulate BEFORE trade (team without player_in, baseline = current wins)
     before = simulate_season(
-        impact_score=profile_out["impact_score"],
+        impact_score=0.0,
         current_team_wins=current_team_wins,
-        games_played=profile_out["gp"],
-        mpg=profile_out["stats"]["mp"],
+        games_played=82,
+        mpg=30.0,
     )
-
-    # Simulate AFTER trade (same baseline wins, now with player_in's impact)
+    # After = команда с новым игроком
     after = simulate_season(
         impact_score=profile_in["impact_score"],
         current_team_wins=current_team_wins,
