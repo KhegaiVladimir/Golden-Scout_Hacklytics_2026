@@ -215,7 +215,10 @@ def generate_report_fallback(computed_results: dict) -> dict:
         action = "sign at the asking price"
         tier = "high-value" if impact > 1.5 else "solid"
     elif decision == 'NEGOTIATE':
-        action = f"negotiate down from ${salary:.1f}M toward fair value ${fair_value:.1f}M"
+        if fair_value > salary:
+            action = f"sign — fair value ${fair_value:.1f}M exceeds the ${salary:.1f}M ask, this is an undervalued contract"
+        else:
+            action = f"negotiate down from ${salary:.1f}M toward fair value ${fair_value:.1f}M"
         tier = "moderate-value"
     else:
         action = f"avoid — fair value ${fair_value:.1f}M does not justify ${salary:.1f}M ask"
