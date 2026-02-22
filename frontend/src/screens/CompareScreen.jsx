@@ -1,4 +1,4 @@
-// CompareScreen.jsx
+// frontend/src/screens/CompareScreen.jsx
 import { useState, useEffect, useRef } from 'react'
 import { fetchProfile, runSimulation, calculateValue, generateCompareVerdict } from '../api/client'
 
@@ -32,12 +32,14 @@ function PlayerSearch({ label, value, onChange, players, salary, onSalary }) {
       background: 'var(--bg-1)', border: '1px solid var(--border)',
       borderRadius: 'var(--r-lg)', padding: '20px',
       display: 'flex', flexDirection: 'column', gap: '12px',
+      // NO overflow:hidden here — that's what was clipping the dropdown
     }}>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px' }}>
         {label}
       </p>
 
-      <div ref={ref} style={{ position: 'relative' }}>
+      {/* Search input + dropdown — isolated stacking context */}
+      <div ref={ref} style={{ position: 'relative', zIndex: 10 }}>
         <div style={{
           display: 'flex', alignItems: 'center',
           background: 'var(--bg-0)', border: '1px solid var(--border)',
@@ -51,21 +53,34 @@ function PlayerSearch({ label, value, onChange, players, salary, onSalary }) {
           </svg>
           <input value={query} onChange={e => { setQuery(e.target.value); onChange('') }}
             placeholder="Search player..."
-            style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-0)', padding: '10px 8px' }}
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              fontFamily: 'var(--font-sans)', fontSize: '13px',
+              color: 'var(--text-0)', padding: '10px 8px',
+            }}
           />
         </div>
+
+        {/* Dropdown — position:fixed so it CANNOT be clipped by any parent overflow */}
         {open && (
           <ul style={{
-            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+            zIndex: 9999,
             background: 'var(--bg-1)', border: '1px solid var(--border)',
             borderRadius: 'var(--r-md)', overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6)', listStyle: 'none',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+            listStyle: 'none', margin: 0, padding: 0,
           }}>
             {filtered.map(name => (
-              <li key={name} onClick={() => select(name)} style={{
-                padding: '9px 14px', fontFamily: 'var(--font-sans)', fontSize: '13px',
-                cursor: 'pointer', color: 'var(--text-1)', borderBottom: '1px solid var(--border)',
-              }}
+              <li key={name}
+                onMouseDown={e => { e.preventDefault(); select(name) }}
+                style={{
+                  padding: '10px 14px',
+                  fontFamily: 'var(--font-sans)', fontSize: '13px',
+                  cursor: 'pointer', color: 'var(--text-1)',
+                  borderBottom: '1px solid var(--border)',
+                  transition: 'background 0.1s ease',
+                }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-0)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-1)' }}
               >
@@ -86,7 +101,11 @@ function PlayerSearch({ label, value, onChange, players, salary, onSalary }) {
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-2)' }}>$</span>
           <input type="number" value={salary} onChange={e => onSalary(Number(e.target.value))} min={1} max={200}
-            style={{ width: '48px', background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: 'var(--text-0)', MozAppearance: 'textfield' }}
+            style={{
+              width: '48px', background: 'none', border: 'none', outline: 'none',
+              fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600,
+              color: 'var(--text-0)', MozAppearance: 'textfield',
+            }}
           />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>M</span>
         </div>
@@ -100,8 +119,7 @@ function StatRow({ label, v1, v2, format = v => v, higherIsBetter = true }) {
   const n2 = typeof v2 === 'number' ? v2 : null
   const p1Better = n1 != null && n2 != null && (higherIsBetter ? n1 > n2 : n1 < n2)
   const p2Better = n1 != null && n2 != null && (higherIsBetter ? n2 > n1 : n2 < n1)
-
-  const cellColor = (better) => better ? 'var(--text-0)' : 'var(--text-2)'
+  const cellColor = better => better ? 'var(--text-0)' : 'var(--text-2)'
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -143,13 +161,13 @@ function RiskLabel({ value }) {
 }
 
 export default function CompareScreen({ onBack, players }) {
-  const [name1, setName1]       = useState('')
-  const [name2, setName2]       = useState('')
-  const [salary1, setSalary1]   = useState(20)
-  const [salary2, setSalary2]   = useState(20)
-  const [result, setResult]     = useState(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
+  const [name1, setName1]      = useState('')
+  const [name2, setName2]      = useState('')
+  const [salary1, setSalary1]  = useState(20)
+  const [salary2, setSalary2]  = useState(20)
+  const [result, setResult]    = useState(null)
+  const [loading, setLoading]  = useState(false)
+  const [error, setError]      = useState(null)
   const [aiVerdict, setAiVerdict]  = useState(null)
   const [aiLoading, setAiLoading]  = useState(false)
 
@@ -201,7 +219,7 @@ export default function CompareScreen({ onBack, players }) {
     <div style={{ minHeight: '100vh', paddingTop: '72px', paddingBottom: '64px' }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 24px' }}>
 
-        {/* ── Header ───────────────────────────────── */}
+        {/* Header */}
         <div className="fade-up" style={{ marginBottom: '40px' }}>
           <button onClick={onBack} style={{
             background: 'none', border: 'none', cursor: 'pointer',
@@ -223,9 +241,14 @@ export default function CompareScreen({ onBack, players }) {
           </p>
         </div>
 
-        {/* ── Player inputs ────────────────────────── */}
+        {/* ── Player inputs — key: overflow:visible on the grid ── */}
         <div className="fade-up-1" style={{ marginBottom: '1px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', marginBottom: '1px' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px',
+            background: 'var(--border)', borderRadius: 'var(--r-lg)',
+            overflow: 'visible',   // ← CRITICAL: not 'hidden'
+            marginBottom: '1px',
+          }}>
             <PlayerSearch label="PLAYER 1" value={name1} onChange={setName1} players={players} salary={salary1} onSalary={setSalary1} />
             <PlayerSearch label="PLAYER 2" value={name2} onChange={setName2} players={players} salary={salary2} onSalary={setSalary2} />
           </div>
@@ -239,6 +262,7 @@ export default function CompareScreen({ onBack, players }) {
             cursor: canRun && !loading ? 'pointer' : 'not-allowed',
             letterSpacing: '-0.1px', transition: 'opacity 0.15s ease',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            marginTop: '8px',   // ← gap between inputs and button
           }}
             onMouseEnter={e => { if (canRun && !loading) e.currentTarget.style.opacity = '0.88' }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
@@ -258,18 +282,13 @@ export default function CompareScreen({ onBack, players }) {
           )}
         </div>
 
-        {/* ── Results ──────────────────────────────── */}
+        {/* Results */}
         {result && (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '1px' }}>
 
             {/* Winner panel */}
-            <div style={{
-              background: 'var(--bg-1)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-lg)', padding: '24px', textAlign: 'center',
-            }}>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                Better Value
-              </p>
+            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '24px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.5px', marginBottom: '8px' }}>Better Value</p>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', fontWeight: 600, letterSpacing: '-0.6px', color: 'var(--text-0)', marginBottom: '6px' }}>
                 {winner === 1 ? result.p1.player : result.p2.player}
               </p>
@@ -277,37 +296,30 @@ export default function CompareScreen({ onBack, players }) {
                 Health-adjusted {fmtMoney(winner === 1 ? result.val1.health_adjusted_value_m : result.val2.health_adjusted_value_m)}
                 {' · '}salary ask ${winner === 1 ? salary1 : salary2}M
               </p>
-
-              {/* AI verdict */}
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', marginBottom: '10px' }}>
                   AI Analysis · Gemini 2.0 Flash
                 </p>
-                {aiLoading ? (
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
-                    <span style={{ display: 'inline-block', animation: 'pulse 1.5s ease infinite' }}>Generating analysis...</span>
-                  </p>
-                ) : aiVerdict ? (
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-1)', lineHeight: 1.7, maxWidth: '520px', margin: '0 auto' }}>
-                    {aiVerdict}
-                  </p>
-                ) : null}
+                {aiLoading
+                  ? <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>Generating analysis...</p>
+                  : aiVerdict
+                  ? <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-1)', lineHeight: 1.7, maxWidth: '520px', margin: '0 auto' }}>{aiVerdict}</p>
+                  : null
+                }
               </div>
             </div>
 
             {/* H2H table */}
             <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '20px 24px' }}>
-              {/* Column headers */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)', textAlign: 'right' }}>{result.p1.player}</p>
                 <div style={{ minWidth: '80px' }} />
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)', textAlign: 'left' }}>{result.p2.player}</p>
               </div>
 
-              {/* Decision row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ textAlign: 'right' }}><VerdictBadge decision={result.val1.decision} /></div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Decision</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Decision</div>
                 <div style={{ textAlign: 'left' }}><VerdictBadge decision={result.val2.decision} /></div>
               </div>
 
@@ -319,10 +331,9 @@ export default function CompareScreen({ onBack, players }) {
               <StatRow label="Impact"       v1={result.p1.impact_score}              v2={result.p2.impact_score}              format={v => v.toFixed(2)} />
               <StatRow label="Durability"   v1={result.val1.durability_score}        v2={result.val2.durability_score}        format={v => v.toFixed(2)} />
 
-              {/* Risk row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ textAlign: 'right' }}><RiskLabel value={result.val1.risk_label} /></div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', letterSpacing: '0.3px', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Risk</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)', textAlign: 'center', alignSelf: 'center', minWidth: '80px' }}>Risk</div>
                 <div style={{ textAlign: 'left' }}><RiskLabel value={result.val2.risk_label} /></div>
               </div>
 
@@ -343,20 +354,18 @@ export default function CompareScreen({ onBack, players }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text-0)' }}>{p.player}</p>
                     {isWinner && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--green)', border: '1px solid var(--green-border)', padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.3px' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--green)', border: '1px solid var(--green-border)', padding: '2px 8px', borderRadius: '999px' }}>
                         BETTER DEAL
                       </span>
                     )}
                   </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <VerdictBadge decision={val.decision} />
-                  </div>
+                  <div style={{ marginBottom: '12px' }}><VerdictBadge decision={val.decision} /></div>
                   {[
-                    { label: 'Fair Value',   value: fmtMoney(val.fair_value_m),              color: val.fair_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
-                    { label: 'Salary Ask',   value: `$${salary}M`,                           color: 'var(--text-0)' },
-                    { label: 'Efficiency',   value: `${val.efficiency_ratio?.toFixed(2) ?? 'N/A'}×`, color: 'var(--text-0)' },
-                    { label: 'Health-Adj.',  value: fmtMoney(val.health_adjusted_value_m),   color: val.health_adjusted_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
-                    { label: 'Risk',         value: <RiskLabel value={val.risk_label} />,     color: null },
+                    { label: 'Fair Value',  value: fmtMoney(val.fair_value_m),            color: val.fair_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
+                    { label: 'Salary Ask',  value: `$${salary}M`,                         color: 'var(--text-0)' },
+                    { label: 'Efficiency',  value: `${val.efficiency_ratio?.toFixed(2) ?? 'N/A'}×`, color: 'var(--text-0)' },
+                    { label: 'Health-Adj.', value: fmtMoney(val.health_adjusted_value_m), color: val.health_adjusted_value_m < 0 ? 'var(--red)' : 'var(--text-0)' },
+                    { label: 'Risk',        value: <RiskLabel value={val.risk_label} />,   color: null },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{label}</span>
@@ -377,7 +386,6 @@ export default function CompareScreen({ onBack, players }) {
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         input::placeholder { color: var(--text-3); }
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
     </div>
   )
