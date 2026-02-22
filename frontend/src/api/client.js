@@ -46,11 +46,15 @@ export const generateAudio = async (text, player_name) => {
   try {
     const res = await api.post('/audio', { text, player_name }, { responseType: 'blob' })
     const contentType = res.headers['content-type'] || ''
+    console.log('audio content-type:', contentType, 'size:', res.data.size)
     if (contentType.includes('application/json')) {
       return null
     }
     return URL.createObjectURL(res.data)
-  } catch { return null }
+  } catch (e) {
+    console.log('audio error:', e)
+    return null
+  }
 }
 
 export const simulateTrade = async (player_out, player_in, current_team_wins) => {
